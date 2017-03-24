@@ -4,6 +4,7 @@ extern crate num_cpus;
 
 mod engine;
 mod components;
+mod tilemap;
 
 use specs::{ World, Planner };
 
@@ -11,12 +12,14 @@ use engine::state::{ StateMachine, State, Transition };
 use engine::input_handler::{ InputHandler };
 use engine::tcod::{ Tcod };
 use components::renderable::{ Renderable };
+use tilemap::{ TileMap };
 
 struct Game;
 impl State for Game {
     fn start(&mut self, world: &mut World) {
         println!("Starte Game");
         world.add_resource::<InputHandler>(InputHandler::default());
+        world.add_resource::<TileMap>(TileMap::new())
     }
 
     fn handle_events(&mut self, world: &mut World) -> Transition {
