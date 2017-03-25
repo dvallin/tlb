@@ -1,2 +1,2 @@
-pub mod renderable;
-pub mod position;
+pub mod appearance;
+pub mod space;

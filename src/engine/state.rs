@@ -12,6 +12,10 @@ pub trait State {
         Transition::None
     }
 
+    fn fixed_update(&mut self, _world: &mut World) -> Transition {
+        Transition::None
+    }
+
     fn handle_events(&mut self, _world: &mut World) -> Transition {
         Transition::None
     }
@@ -46,6 +50,16 @@ impl StateMachine {
         if self.running {
             let transition = match self.states.last_mut() {
                 Some(state) => state.update(world),
+                None => Transition::None,
+            };
+            self.transition(transition, world)
+        }
+    }
+
+    pub fn fixed_update(&mut self, world: &mut World) {
+        if self.running {
+            let transition = match self.states.last_mut() {
+                Some(state) => state.fixed_update(world),
                 None => Transition::None,
             };
             self.transition(transition, world)

@@ -1,5 +1,4 @@
 use tcod::colors::{ Color };
-use tcod::console::{ Console, BackgroundFlag };
 
 use specs::{ Component, VecStorage };
 

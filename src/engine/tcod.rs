@@ -1,16 +1,17 @@
-use tcod::console::*;
 use tcod::system::*;
+use tcod::console::*;
 
 use specs::{ World, Join };
 
-use components::renderable::{ Renderable };
-use components::position::{ Position };
+use components::appearance::{ Renderable };
+use components::space::{ Position };
 use tilemap::{ TileMap };
 
 const SCREEN_WIDTH: i32 = 80;
 const SCREEN_HEIGHT: i32 = 50;
 const MAP_WIDTH: i32 = 80;
 const MAP_HEIGHT: i32 = 43;
+const MAX_FPS: i32 = 60;
 
 pub struct Tcod {
     root: Root,
@@ -24,6 +25,8 @@ impl Tcod {
             .size(SCREEN_WIDTH, SCREEN_HEIGHT)
             .title("Rust/libtcod tutorial")
             .init();
+
+        set_fps(MAX_FPS);
 
         Tcod {
             root: root,
@@ -47,5 +50,6 @@ impl Tcod {
         }
         blit(&mut self.console, (0, 0), (MAP_WIDTH, MAP_HEIGHT),
              &mut self.root,(0, 0), 1.0, 1.0);
+        self.root.flush();
     }
 }
