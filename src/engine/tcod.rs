@@ -40,14 +40,18 @@ impl Tcod {
         let positions = world.read::<Position>();
         let tilemap = world.read_resource::<TileMap>();
 
-        self.root.clear();
-        tilemap.draw(&mut self.console);
+        {
+            self.console.clear();
+            tilemap.draw(&mut self.console);
 
-        for (renderable, _entity, position) in (&renderables, &entities, &positions).iter() {
-            self.console.set_default_foreground(renderable.color);
-            self.console.put_char(position.x as i32, position.y as i32,
-                                  renderable.character, BackgroundFlag::None);
+            for (renderable, _entity, position) in (&renderables, &entities, &positions).iter() {
+                self.console.set_default_foreground(renderable.color);
+                self.console.put_char(position.x as i32, position.y as i32,
+                                    renderable.character, BackgroundFlag::None);
+            }
         }
+
+        self.root.clear();
         blit(&mut self.console, (0, 0), (MAP_WIDTH, MAP_HEIGHT),
              &mut self.root,(0, 0), 1.0, 1.0);
         self.root.flush();

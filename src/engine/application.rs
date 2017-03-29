@@ -2,7 +2,7 @@ use num_cpus;
 
 use std::time::{ Duration, Instant };
 
-use specs::{ World, Planner };
+use specs::{ World, Planner, Component, Priority, System };
 
 use engine::state::{ StateMachine, State };
 use engine::tcod::{ Tcod };
@@ -23,21 +23,26 @@ pub struct Application {
 }
 
 impl Application {
-    pub fn new<T>(initial_state: T) -> Self where T: State + 'static {
-        let mut world = World::new();
+    pub fn new<T>(initial_state: T, mut planner: Planner<()>) -> Self
+        where T: State + 'static {
 
-        let time = Time {
-            delta_time: Duration::new(0, 0),
-            fixed_step: Duration::new(0, 16666666),
-            last_fixed_update: Instant::now(),
-        };
+        {
+            let mut world = planner.mut_world();
 
-        world.add_resource::<Time>(time);
+            let time = Time {
+                delta_time: Duration::new(0, 0),
+                fixed_step: Duration::new(0, 16666666),
+                last_fixed_update: Instant::now(),
+            };
 
-        world.register::<Renderable>();
-        world.register::<Position>();
+            world.add_resource::<Time>(time);
+
+            world.register::<Renderable>();
+            world.register::<Position>();
+        }
+
         Application {
-            planner: Planner::new(world, num_cpus::get()),
+            planner: planner,
             state: StateMachine::new(initial_state),
             tcod: Tcod::new(),
             timer: Stopwatch::default(),
@@ -88,5 +93,42 @@ impl Application {
     fn initialize(&mut self) {
         let world = self.planner.mut_world();
         self.state.start(world);
+    }
+}
+pub struct ApplicationBuilder<T> where T: State + 'static {
+    initial_state: T,
+    planner: Planner<()>,
+}
+
+impl<T> ApplicationBuilder<T> where T: State + 'static {
+    /// Creates a new ApplicationBuilder with the given initial game state and
+    /// display configuration.
+    pub fn new(initial_state: T) -> ApplicationBuilder<T> {
+        ApplicationBuilder {
+            initial_state: initial_state,
+            planner: Planner::new(World::new(), num_cpus::get()),
+        }
+    }
+
+    /// Registers a given component type.
+    pub fn register<C>(mut self) -> ApplicationBuilder<T> where C: Component {
+        {
+            let world = &mut self.planner.mut_world();
+            world.register::<C>();
+        }
+        self
+    }
+
+    /// Adds a given system `pro`, assigns it the string identifier `name`,
+    /// and marks it with the runtime priority `pri`.
+    pub fn with<S>(mut self, sys: S, name: &str, pri: Priority) -> ApplicationBuilder<T>
+        where S: System<()> + 'static {
+        self.planner.add_system::<S>(sys, name, pri);
+        self
+    }
+
+    /// Builds the Application and returns the result.
+    pub fn build(self) -> Application {
+        Application::new(self.initial_state, self.planner)
     }
 }
