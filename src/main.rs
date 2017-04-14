@@ -15,6 +15,7 @@ use engine::application::{ ApplicationBuilder };
 use engine::time::{ Time };
 
 use tcod::colors::{ self };
+use tcod::chars::{ self };
 
 use tilemap::{ TileMap };
 
@@ -34,14 +35,21 @@ impl System<()> for GameSystem {
              w.read_resource::<InputHandler>())
         });
 
+        let delta_time = time.delta_time.subsec_nanos() as f32 / 1.0e9;
+
         // proccess players
         for (player, position) in (&players, &mut positions).iter() {
-            match input.key {
-                tcod::input::Key { printable: 'h', ..} => position.x -= 1.0,
-                tcod::input::Key { printable: 'j', ..} => position.y -= 1.0,
-                tcod::input::Key { printable: 'k', ..} => position.y += 1.0,
-                tcod::input::Key { printable: 'l', ..} => position.x += 1.0,
-                _ => (),
+            if input.is_pressed('h') {
+                position.x -= delta_time;
+            }
+            if input.is_pressed('j') {
+                position.y += delta_time;
+            }
+            if input.is_pressed('k') {
+                position.y -= delta_time;
+            }
+            if input.is_pressed('l') {
+                position.x += delta_time;
             }
         }
     }

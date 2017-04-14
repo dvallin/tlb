@@ -5,6 +5,11 @@ pub struct Position {
     pub y: f32,
 }
 
+pub struct Vector {
+    pub x: f32,
+    pub y: f32,
+}
+
 impl Component for Position {
     type Storage = VecStorage<Position>;
 }
