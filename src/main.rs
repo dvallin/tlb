@@ -13,6 +13,7 @@ use engine::state::{ State, Transition };
 use engine::input_handler::{ InputHandler };
 use engine::application::{ ApplicationBuilder };
 use engine::time::{ Time };
+use engine::tcod::{ Tcod };
 
 use tcod::colors::{ self };
 use tcod::chars::{ self };
@@ -28,11 +29,12 @@ unsafe impl Sync for GameSystem {}
 
 impl System<()> for GameSystem {
     fn run(&mut self, arg: RunArg, _: ()) {
-        let (players, mut positions, time, input) = arg.fetch(|w| {
+        let (players, mut positions, time, input, mut map) = arg.fetch(|w| {
             (w.read::<PlayerControlled>(),
              w.write::<Position>(),
              w.read_resource::<Time>(),
-             w.read_resource::<InputHandler>())
+             w.read_resource::<InputHandler>(),
+             w.write_resource::<TileMap>())
         });
 
         let delta_time = time.delta_time.subsec_nanos() as f32 / 1.0e9;
@@ -55,9 +57,11 @@ impl System<()> for GameSystem {
     }
 }
 
+
+const TORCH_RADIUS: i32 = 10;
 struct Game;
 impl State for Game {
-    fn start(&mut self, world: &mut World) {
+    fn start(&mut self, tcod: &mut Tcod, world: &mut World) {
         world.add_resource::<InputHandler>(InputHandler::default());
 
         let mut map = TileMap::new();
@@ -81,6 +85,41 @@ impl State for Game {
             _ => (),
         }
         Transition::None
+    }
+
+    fn update(&mut self, tcod: &mut Tcod, world: &mut World) -> Transition {
+        let entities = world.entities();
+        let players = world.read::<PlayerControlled>();
+        let positions = world.read::<Position>();
+        let mut tilemap = world.write_resource::<TileMap>();
+        for (player, _entity, position) in (&players, &entities, &positions).iter() {
+            tcod.compute_fov(position.x as i32, position.y as i32, TORCH_RADIUS);
+        }
+
+        tilemap.update(tcod);
+
+        Transition::None
+    }
+
+    fn render(&mut self, tcod: &mut Tcod, world: &mut World) {
+        let entities = world.entities();
+        let renderables = world.read::<Renderable>();
+        let positions = world.read::<Position>();
+        let tilemap = world.read_resource::<TileMap>();
+        let bgcolor = colors::BLACK;
+
+        tcod.clear();
+
+        {
+            tilemap.draw(tcod);
+
+            for (renderable, _entity, position) in (&renderables, &entities, &positions).iter() {
+                tcod.render(position.x as i32, position.y as i32,
+                            bgcolor, renderable.color, renderable.character);
+            }
+        }
+
+        tcod.flush();
     }
 }
 

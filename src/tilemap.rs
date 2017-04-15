@@ -1,6 +1,8 @@
 use tcod::console::{ Console, BackgroundFlag };
+use tcod::map::{Map as FovMap};
+use engine::tcod::{ Tcod };
 
-use tcod::colors::{ Color };
+use tcod::colors::{ self, Color };
 use tcod::chars::{ self };
 
 use geometry::{ Shape, Rect };
@@ -13,31 +15,44 @@ const MAP_HEIGHT: i32 = 43;
 
 #[derive(Clone, Debug)]
 struct Tile {
-    color: Color,
-    character: Option<char>,
     blocking: bool,
+    discovered: bool,
     wall: bool,
+    room: Option<i32>,
 }
 
 impl Tile {
-    pub fn create(color: Color, character: Option<char>, blocking: bool, wall: bool) -> Self {
-        Tile { color: color, character: character, blocking: blocking, wall: wall }
+    pub fn create(blocking: bool, wall: bool, room: Option<i32>) -> Self {
+        Tile { blocking: blocking, wall: wall, room: room, discovered: false }
     }
 
     pub fn bedrock() -> Self {
-        Tile::create(COLOR_DARK_BEDROCK, None, true, false)
+        Tile::create(true, false, None)
     }
 
-    pub fn wall() -> Self {
-        Tile::create(COLOR_DARK_WALL, None, true, true)
+    pub fn wall(room: i32) -> Self {
+        Tile::create(true, true, Some(room))
     }
 
-    pub fn floor() -> Self {
-        Tile::create(COLOR_DARK_FLOOR, None, false, false)
+    pub fn floor(room: i32) -> Self {
+        Tile::create(false, false, Some(room))
     }
 
-    pub fn setCharacter(&mut self, character: char) {
-        self.character = Some(character);
+    pub fn character(&self, visible: bool) -> Option<char> {
+        if !self.discovered {
+            return None;
+        }
+
+        if self.wall {
+            return Some('#');
+        } else if !self.blocking {
+            return Some('.');
+        }
+        None
+    }
+
+    pub fn update(&mut self, visible: bool) {
+        self.discovered = self.discovered || visible;
     }
 }
 
@@ -45,6 +60,7 @@ pub struct TileMap {
     map: Vec<Vec<Tile>>,
     width: i32,
     height: i32,
+    rooms: i32,
 }
 
 impl TileMap {
@@ -54,6 +70,7 @@ impl TileMap {
             width: MAP_WIDTH,
             height: MAP_HEIGHT,
             map: map,
+            rooms: 0
         }
     }
 
@@ -63,28 +80,39 @@ impl TileMap {
         self.create_room(&Rect::new(5, 5, 15, 15));
         self.create_room(&Rect::new(1, 1, 0, 0));
         self.create_room(&Rect::new(3, 1, 1, 1));
-        self.create_characters();
     }
 
-    pub fn draw(&self, console: &mut Console) {
+    pub fn update(&mut self, tcod: &Tcod) {
         for y in 0..self.height {
             for x in 0..self.width {
-                let color = self.map[x as usize][y as usize].color;
-                console.set_char_background(x, y, color, BackgroundFlag::Set);
+                let visible = tcod.is_in_fov(x,y);
+                self.map[x as usize][y as usize].update(visible);
+            }
+        }
+    }
 
-                if let Some(character) = self.map[x as usize][y as usize].character {
-                    console.put_char(x, y, character, BackgroundFlag::None);
+    pub fn draw(&self, tcod: &mut Tcod) {
+        let bgcolor = colors::BLACK;
+        let fgcolor = colors::WHITE;
+        for y in 0..self.height {
+            for x in 0..self.width {
+                let visible = tcod.is_in_fov(x, y);
+
+                if let Some(character) = self.map[x as usize][y as usize].character(visible) {
+                    tcod.render(x, y, bgcolor, fgcolor, character);
                 }
             }
         }
     }
 
     fn create_room<T>(self: &mut TileMap, room: &T) where T: Shape {
+        let id = self.rooms;
+        self.rooms += 1;
         for pos in room.into_iter() {
             let tile = if room.is_boundary(pos) {
-                Tile::wall()
+                Tile::wall(id)
             } else {
-                Tile::floor()
+                Tile::floor(id)
             };
             self.map[pos.x as usize][pos.y as usize] = tile;
         }
@@ -98,25 +126,53 @@ impl TileMap {
         }
     }
 
-    fn is_blocking(self: &TileMap, x: i32, y: i32) -> bool {
+    pub fn is_blocking(self: &TileMap, x: i32, y: i32) -> bool {
         match self.get(x, y) {
             Some(t) => t.blocking,
             None => true,
         }
     }
 
-    fn is_wall(self: &TileMap, x: i32, y: i32) -> bool {
+    pub fn is_sight_blocking(self: &TileMap, x: i32, y: i32) -> bool {
+        match self.get(x, y) {
+            Some(t) => t.blocking,
+            None => true,
+        }
+    }
+
+    pub fn is_wall(self: &TileMap, x: i32, y: i32) -> bool {
         match self.get(x, y) {
             Some(t) => t.wall,
             None => false,
         }
     }
 
-    fn create_wall_character(self: &TileMap, x: i32, y: i32) -> char {
-        let n = self.is_wall(x, y - 1);
-        let e = self.is_wall(x + 1, y);
-        let s = self.is_wall(x, y + 1);
-        let w = self.is_wall(x - 1, y);
+    fn create_dbox_character(self: &TileMap, n: bool, e: bool, s: bool, w: bool) -> char {
+        match (n, e, s, w) {
+            (true, true, false, false) => chars::DSW,
+            (true, false, false, true) => chars::DSE,
+            (false, true, true, false) => chars::DNW,
+            (false, false, true, true) => chars::DNE,
+
+            (true, false, true, false)
+                | (true, false, false, false)
+                | (false, false, true, false) => chars::DVLINE,
+            (false, true, false, true)
+                | (false, false, false, true)
+                | (false, true, false, false) => chars::DHLINE,
+
+            (true, false, true, true) => chars::DTEEW,
+            (true, true, true, false) => chars::DTEEE,
+            (true, true, false, true) => chars::DTEEN,
+            (false, true, true, true) => chars::DTEES,
+
+            (true, true, true, true) => chars::DCROSS,
+
+            (false, false, false, false) => chars::BLOCK3,
+        }
+    }
+
+    fn create_box_character(self: &TileMap, n: bool, e: bool, s: bool, w: bool) -> char {
         match (n, e, s, w) {
             (true, true, false, false) => chars::SW,
             (true, false, false, true) => chars::SE,
@@ -137,18 +193,7 @@ impl TileMap {
 
             (true, true, true, true) => chars::CROSS,
 
-            (false, false, false, false) => chars::CHECKBOX_UNSET,
-        }
-    }
-
-    fn create_characters(self: &mut TileMap) {
-        for y in 0..self.height {
-            for x in 0..self.width {
-                if self.is_wall(x, y) {
-                    let c = self.create_wall_character(x, y);
-                    self.map[x as usize][y as usize].character = Some(c);
-                }
-            }
+            (false, false, false, false) => chars::BLOCK3,
         }
     }
 }

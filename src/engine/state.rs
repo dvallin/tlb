@@ -1,4 +1,5 @@
 use specs::World;
+use engine::tcod::{ Tcod };
 
 pub enum Transition {
     None,
@@ -6,19 +7,21 @@ pub enum Transition {
 }
 
 pub trait State {
-    fn start(&mut self, world: &mut World);
+    fn start(&mut self, tcod: &mut Tcod, world: &mut World);
 
-    fn update(&mut self, _world: &mut World) -> Transition {
+    fn update(&mut self, tcod: &mut Tcod, _world: &mut World) -> Transition {
         Transition::None
     }
 
-    fn fixed_update(&mut self, _world: &mut World) -> Transition {
+    fn fixed_update(&mut self, tcod: &mut Tcod, _world: &mut World) -> Transition {
         Transition::None
     }
 
     fn handle_events(&mut self, _world: &mut World) -> Transition {
         Transition::None
     }
+
+    fn render(&mut self, tcod: &mut Tcod, world: &mut World);
 }
 
 pub struct StateMachine {
@@ -34,10 +37,10 @@ impl StateMachine {
         }
     }
 
-    pub fn start(&mut self, world: &mut World) {
+    pub fn start(&mut self, tcod: &mut Tcod, world: &mut World) {
         if !self.running {
             let state = self.states.last_mut().unwrap();
-            state.start(world);
+            state.start(tcod, world);
             self.running = true;
         }
     }
@@ -46,23 +49,30 @@ impl StateMachine {
         self.running
     }
 
-    pub fn update(&mut self, world: &mut World) {
+    pub fn update(&mut self, tcod: &mut Tcod, world: &mut World) {
         if self.running {
             let transition = match self.states.last_mut() {
-                Some(state) => state.update(world),
+                Some(state) => state.update(tcod, world),
                 None => Transition::None,
             };
             self.transition(transition, world)
         }
     }
 
-    pub fn fixed_update(&mut self, world: &mut World) {
+    pub fn fixed_update(&mut self, tcod: &mut Tcod, world: &mut World) {
         if self.running {
             let transition = match self.states.last_mut() {
-                Some(state) => state.fixed_update(world),
+                Some(state) => state.fixed_update(tcod, world),
                 None => Transition::None,
             };
             self.transition(transition, world)
+        }
+    }
+
+    pub fn render(&mut self, tcod: &mut Tcod, world: &mut World) {
+        if self.running {
+            let state = self.states.last_mut().unwrap();
+            state.render(tcod, world);
         }
     }
 

@@ -74,10 +74,10 @@ impl Application {
 
             self.state.handle_events(world);
             if self.last_fixed_update.elapsed() >= self.fixed_step {
-                self.state.fixed_update(world);
+                self.state.fixed_update(&mut self.tcod, world);
                 self.last_fixed_update += self.fixed_step;
             }
-            self.state.update(world);
+            self.state.update(&mut self.tcod, world);
         }
 
         // execute world update
@@ -86,13 +86,13 @@ impl Application {
 
         { // render world
             let world = &mut self.planner.mut_world();
-            self.tcod.render(world);
+            self.state.render(&mut self.tcod, world);
         }
     }
 
     fn initialize(&mut self) {
         let world = self.planner.mut_world();
-        self.state.start(world);
+        self.state.start(&mut self.tcod, world);
     }
 }
 pub struct ApplicationBuilder<T> where T: State + 'static {
