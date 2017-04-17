@@ -7,59 +7,38 @@ mod components;
 mod tilemap;
 mod geometry;
 
-use specs::{ World, System, RunArg, Join };
+use specs::{ World, Join };
 
 use engine::state::{ State, Transition };
 use engine::input_handler::{ InputHandler };
 use engine::application::{ ApplicationBuilder };
-use engine::time::{ Time };
 use engine::tcod::{ Tcod };
 
 use tcod::colors::{ self };
-use tcod::chars::{ self };
 
 use tilemap::{ TileMap };
 
 use components::appearance::{ Renderable };
 use components::space::{ Position };
-use components::control::{ PlayerControlled };
-
-struct GameSystem;
-unsafe impl Sync for GameSystem {}
-
-impl System<()> for GameSystem {
-    fn run(&mut self, arg: RunArg, _: ()) {
-        let (players, mut positions, time, input, mut map) = arg.fetch(|w| {
-            (w.read::<PlayerControlled>(),
-             w.write::<Position>(),
-             w.read_resource::<Time>(),
-             w.read_resource::<InputHandler>(),
-             w.write_resource::<TileMap>())
-        });
-
-        let delta_time = time.delta_time.subsec_nanos() as f32 / 1.0e9;
-
-        // proccess players
-        for (player, position) in (&players, &mut positions).iter() {
-            if input.is_pressed('h') {
-                position.x -= delta_time;
-            }
-            if input.is_pressed('j') {
-                position.y += delta_time;
-            }
-            if input.is_pressed('k') {
-                position.y -= delta_time;
-            }
-            if input.is_pressed('l') {
-                position.x += delta_time;
-            }
-        }
-    }
-}
-
+use components::control::{ PlayerController, Player, Fov };
 
 const TORCH_RADIUS: i32 = 10;
 struct Game;
+
+impl Game {
+    fn create_player(&mut self, index: usize, x: f32, y: f32, active: bool,
+                     tcod: &mut Tcod, world: &mut World) {
+        let fov_index = tcod.create_fov();
+        tcod.initialize_fov(fov_index, world);
+        world.create_now()
+            .with(Position { x: x, y: y })
+            .with(Renderable {character: '@', color: colors::WHITE })
+            .with(Player {index: index, active: active})
+            .with(Fov { index: fov_index })
+            .build();
+    }
+}
+
 impl State for Game {
     fn start(&mut self, tcod: &mut Tcod, world: &mut World) {
         world.add_resource::<InputHandler>(InputHandler::default());
@@ -68,13 +47,11 @@ impl State for Game {
         map.build();
         world.add_resource::<TileMap>(map);
 
-        world.register::<PlayerControlled>();
+        world.register::<Player>();
+        world.register::<Fov>();
 
-        world.create_now()
-            .with(Position { x: 15.0, y: 15.0 })
-            .with(Renderable {character: '@', color: colors::WHITE })
-            .with(PlayerControlled {})
-            .build();
+        self.create_player(1, 15.0, 15.0, true, tcod, world);
+        self.create_player(2, 16.0, 16.0, false, tcod, world);
     }
 
     fn handle_events(&mut self, world: &mut World) -> Transition {
@@ -89,11 +66,11 @@ impl State for Game {
 
     fn update(&mut self, tcod: &mut Tcod, world: &mut World) -> Transition {
         let entities = world.entities();
-        let players = world.read::<PlayerControlled>();
+        let fovs = world.read::<Fov>();
         let positions = world.read::<Position>();
         let mut tilemap = world.write_resource::<TileMap>();
-        for (player, _entity, position) in (&players, &entities, &positions).iter() {
-            tcod.compute_fov(position.x as i32, position.y as i32, TORCH_RADIUS);
+        for (fov, _entity, position) in (&fovs, &entities, &positions).iter() {
+            tcod.compute_fov(fov.index, position.x as i32, position.y as i32, TORCH_RADIUS);
         }
 
         tilemap.update(tcod);
@@ -125,8 +102,7 @@ impl State for Game {
 
 fn main() {
     ApplicationBuilder::new(Game)
-        .register::<PlayerControlled>()
-        .with::<GameSystem>(GameSystem, "game_system", 1)
+        .with::<PlayerController>(PlayerController, "player_controller_system", 1)
         .build()
         .run();
 
