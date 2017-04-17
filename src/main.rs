@@ -22,6 +22,7 @@ use components::appearance::{ Renderable };
 use components::space::{ Position };
 use components::control::{ PlayerController, Player, Fov };
 
+
 const TORCH_RADIUS: i32 = 10;
 struct Game;
 
