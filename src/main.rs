@@ -6,6 +6,7 @@ mod engine;
 mod components;
 mod tilemap;
 mod geometry;
+mod systems;
 
 use specs::{ World, Join };
 
@@ -20,7 +21,9 @@ use tilemap::{ TileMap };
 
 use components::appearance::{ Renderable };
 use components::space::{ Position };
-use components::control::{ PlayerController, Player, Fov };
+use components::player::{ Player, Fov };
+
+use systems::player_controller::{ PlayerController };
 
 
 const TORCH_RADIUS: i32 = 10;
@@ -47,9 +50,6 @@ impl State for Game {
         let mut map = TileMap::new();
         map.build();
         world.add_resource::<TileMap>(map);
-
-        world.register::<Player>();
-        world.register::<Fov>();
 
         self.create_player(1, 15.0, 15.0, true, tcod, world);
         self.create_player(2, 16.0, 16.0, false, tcod, world);
@@ -103,6 +103,8 @@ impl State for Game {
 
 fn main() {
     ApplicationBuilder::new(Game)
+        .register::<Player>()
+        .register::<Fov>()
         .with::<PlayerController>(PlayerController, "player_controller_system", 1)
         .build()
         .run();

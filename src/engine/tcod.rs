@@ -72,7 +72,7 @@ impl Tcod {
     }
 
     pub fn render(&mut self, x: i32, y: i32, bgcolor: Color, fgcolor: Color, character: char) {
-        self.console.set_char_foreground(x, y, fgcolor);
+        self.console.set_default_foreground(fgcolor);
         self.console.set_char_background(x, y, bgcolor, BackgroundFlag::Set);
         self.console.put_char(x, y, character, BackgroundFlag::None);
     }

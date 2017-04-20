@@ -1,29 +1,11 @@
-use specs::{ Component, HashMapStorage, World, System, RunArg, Join };
+use specs::{ System, RunArg, Join };
 
 use components::space::{ Position, Vector, mul };
+use components::player::{ Player };
 use engine::input_handler::{ InputHandler };
 use engine::time::{ Time };
 
-
 const PLAYER_SPEED: f32 = 4.0;
-
-pub struct Player {
-    pub active: bool,
-    pub index: usize,
-}
-
-impl Component for Player {
-    type Storage = HashMapStorage<Player>;
-}
-
-pub struct Fov {
-    pub index: usize,
-}
-
-impl Component for Fov {
-    type Storage = HashMapStorage<Fov>;
-}
-
 
 pub struct PlayerController;
 unsafe impl Sync for PlayerController {}

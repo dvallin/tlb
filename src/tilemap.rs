@@ -1,15 +1,10 @@
-use tcod::console::{ Console, BackgroundFlag };
-use tcod::map::{Map as FovMap};
 use engine::tcod::{ Tcod };
 
 use tcod::colors::{ self, Color };
 use tcod::chars::{ self };
 
-use geometry::{ Shape, Rect };
+use geometry::{ Shape, Line, Rect };
 
-const COLOR_DARK_BEDROCK: Color = Color { r: 0, g: 0, b: 50 };
-const COLOR_DARK_WALL: Color = Color { r: 0, g: 0, b: 100 };
-const COLOR_DARK_FLOOR: Color = Color { r: 50, g: 50, b: 150 };
 const MAP_WIDTH: i32 = 80;
 const MAP_HEIGHT: i32 = 43;
 
@@ -38,7 +33,7 @@ impl Tile {
         Tile::create(false, false, Some(room))
     }
 
-    pub fn character(&self, visible: bool) -> Option<char> {
+    pub fn character(&self) -> Option<char> {
         if !self.discovered {
             return None;
         }
@@ -49,6 +44,30 @@ impl Tile {
             return Some('.');
         }
         None
+    }
+
+    pub fn fg_color(&self, visible: bool) -> Color {
+        if !self.discovered {
+            return colors::BLACK;
+        }
+
+        if visible {
+            return colors::LIGHTEST_GREY;
+        } else {
+            return colors::DARK_GREEN;
+        }
+    }
+
+    pub fn bg_color(&self, visible: bool) -> Color {
+        if !self.discovered || !self.blocking || !visible {
+            return colors::DARKEST_GREY;
+        }
+
+        if visible {
+            return colors::DARKER_GREY;
+        } else {
+            return colors::DARKEST_GREY;
+        }
     }
 
     pub fn update(&mut self, visible: bool) {
@@ -80,6 +99,9 @@ impl TileMap {
         self.create_room(&Rect::new(5, 5, 15, 15));
         self.create_room(&Rect::new(1, 1, 0, 0));
         self.create_room(&Rect::new(3, 1, 1, 1));
+        self.draw_line(&Line::new(10, 3, 10, 10));
+        self.draw_line(&Line::new(15, 15, 10, 10));
+        self.draw_line(&Line::new(15, 15, 25, 22));
     }
 
     pub fn update(&mut self, tcod: &Tcod) {
@@ -92,14 +114,13 @@ impl TileMap {
     }
 
     pub fn draw(&self, tcod: &mut Tcod) {
-        let bgcolor = colors::BLACK;
-        let fgcolor = colors::WHITE;
         for y in 0..self.height {
             for x in 0..self.width {
-                let visible = tcod.is_in_fov(x, y);
-
-                if let Some(character) = self.map[x as usize][y as usize].character(visible) {
-                    tcod.render(x, y, bgcolor, fgcolor, character);
+                if let Some(character) = self.map[x as usize][y as usize].character() {
+                    let visible = tcod.is_in_fov(x, y);
+                    let fg_color = self.map[x as usize][y as usize].fg_color(visible);
+                    let bg_color = self.map[x as usize][y as usize].bg_color(visible);
+                    tcod.render(x, y, bg_color, fg_color, character);
                 }
             }
         }
@@ -115,6 +136,14 @@ impl TileMap {
                 Tile::floor(id)
             };
             self.map[pos.x as usize][pos.y as usize] = tile;
+        }
+    }
+
+    fn draw_line(self: &mut TileMap, line: &Line) {
+        for pos in line.into_iter() {
+            if let Some(id) = self.map[pos.x as usize][pos.y as usize].room {
+                self.map[pos.x as usize][pos.y as usize] = Tile::wall(id);
+            }
         }
     }
 

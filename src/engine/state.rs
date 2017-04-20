@@ -9,11 +9,11 @@ pub enum Transition {
 pub trait State {
     fn start(&mut self, tcod: &mut Tcod, world: &mut World);
 
-    fn update(&mut self, tcod: &mut Tcod, _world: &mut World) -> Transition {
+    fn update(&mut self, _tcod: &mut Tcod, _world: &mut World) -> Transition {
         Transition::None
     }
 
-    fn fixed_update(&mut self, tcod: &mut Tcod, _world: &mut World) -> Transition {
+    fn fixed_update(&mut self, _tcod: &mut Tcod, _world: &mut World) -> Transition {
         Transition::None
     }
 
