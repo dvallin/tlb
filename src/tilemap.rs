@@ -96,6 +96,7 @@ impl TileMap {
     pub fn build(&mut self) {
         self.create_room(&Rect::new(10, 10, 15, 15));
         self.create_room(&Rect::new(20, 20, 15, 15));
+        self.create_anti_room(&Rect::new(25, 25, 7, 10));
         self.create_room(&Rect::new(5, 5, 15, 15));
         self.create_room(&Rect::new(1, 1, 0, 0));
         self.create_room(&Rect::new(3, 1, 1, 1));
@@ -136,6 +137,19 @@ impl TileMap {
                 Tile::floor(id)
             };
             self.map[pos.x as usize][pos.y as usize] = tile;
+        }
+    }
+
+    fn create_anti_room<T>(self: &mut TileMap, room: &T) where T: Shape {
+        for pos in room.into_iter() {
+            if let Some(id) = self.map[pos.x as usize][pos.y as usize].room {
+                let tile = if room.is_boundary(pos) {
+                    Tile::wall(id)
+                } else {
+                    Tile::bedrock()
+                };
+                self.map[pos.x as usize][pos.y as usize] = tile;
+            }
         }
     }
 
