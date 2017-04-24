@@ -94,15 +94,15 @@ impl TileMap {
     }
 
     pub fn build(&mut self) {
-        self.create_room(&Rect::new(10, 10, 15, 15));
         self.create_room(&Rect::new(20, 20, 15, 15));
-        self.create_anti_room(&Rect::new(25, 25, 7, 10));
-        self.create_room(&Rect::new(5, 5, 15, 15));
-        self.create_room(&Rect::new(1, 1, 0, 0));
-        self.create_room(&Rect::new(3, 1, 1, 1));
-        self.draw_line(&Line::new(10, 3, 10, 10));
-        self.draw_line(&Line::new(15, 15, 10, 10));
-        self.draw_line(&Line::new(15, 15, 25, 22));
+        self.create_anti_room(&Rect::new(25, 25, 5, 5));
+        self.draw_line(&Line::new(25, 22, 25, 27));
+
+        self.create_room(&Rect::new(10, 25, 5, 5));
+        self.create_room(&Rect::new(10, 12, 8, 8));
+
+        self.create_corridor(&Rect::new(11, 19, 2, 7));
+        self.create_corridor(&Rect::new(14, 27, 7, 2));
     }
 
     pub fn update(&mut self, tcod: &Tcod) {
@@ -150,6 +150,31 @@ impl TileMap {
                 };
                 self.map[pos.x as usize][pos.y as usize] = tile;
             }
+        }
+    }
+
+    fn create_corridor(self: &mut TileMap, corridor: &Rect) {
+        let id = self.rooms;
+        self.rooms += 1;
+        for pos in corridor.into_iter() {
+            let is_wall = corridor.is_boundary(pos);
+
+            let tile;
+            if let Some(old_id) = self.map[pos.x as usize][pos.y as usize].room {
+                let was_wall = self.map[pos.x as usize][pos.y as usize].wall;
+                tile = if was_wall && is_wall {
+                    Tile::wall(old_id)
+                } else {
+                    Tile::floor(old_id)
+                };
+            } else {
+                tile = if is_wall {
+                    Tile::wall(id)
+                } else {
+                    Tile::floor(id)
+                };
+            }
+            self.map[pos.x as usize][pos.y as usize] = tile;
         }
     }
 
