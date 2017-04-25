@@ -3,7 +3,8 @@ use engine::tcod::{ Tcod };
 use tcod::colors::{ self, Color };
 use tcod::chars::{ self };
 
-use geometry::{ Shape, Line, Rect };
+use components::space::{ Viewport };
+use geometry::{ Shape, Line, Rect, Pos };
 
 const MAP_WIDTH: i32 = 80;
 const MAP_HEIGHT: i32 = 43;
@@ -114,15 +115,16 @@ impl TileMap {
         }
     }
 
-    pub fn draw(&self, tcod: &mut Tcod) {
-        for y in 0..self.height {
-            for x in 0..self.width {
-                if let Some(character) = self.map[x as usize][y as usize].character() {
-                    let visible = tcod.is_in_fov(x, y);
-                    let fg_color = self.map[x as usize][y as usize].fg_color(visible);
-                    let bg_color = self.map[x as usize][y as usize].bg_color(visible);
-                    tcod.render(x, y, bg_color, fg_color, character);
-                }
+    pub fn draw(&self, tcod: &mut Tcod, viewport: &Viewport) {
+        let default = Tile::bedrock();
+        for pixel in viewport.into_iter() {
+            let tile = self.get(pixel.x, pixel.y).unwrap_or(&default);
+            if let Some(character) = tile.character() {
+                let Pos { x, y } = viewport.transform(pixel);
+                let visible = tcod.is_in_fov(pixel.x as i32, pixel.y as i32);
+                let fg_color = self.map[pixel.x as usize][pixel.y as usize].fg_color(visible);
+                let bg_color = self.map[pixel.x as usize][pixel.y as usize].bg_color(visible);
+                tcod.render(x as i32, y as i32, bg_color, fg_color, character);
             }
         }
     }

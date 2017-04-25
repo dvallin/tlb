@@ -1,5 +1,6 @@
 use std::ops::{ AddAssign };
 use specs::{ Component, VecStorage };
+use geometry::{ Rect, Pos, Shape, RectIter };
 
 #[derive(Copy, Clone)]
 pub struct Position {
@@ -41,4 +42,32 @@ impl AddAssign<Vector> for Position {
 
 impl Component for Position {
     type Storage = VecStorage<Position>;
+}
+
+pub struct Viewport {
+    r: Rect,
+}
+
+impl Viewport {
+    pub fn new(x: i32, y: i32, w: i32, h: i32) -> Self {
+        Viewport {
+            r: Rect::new(x, y, w, h)
+        }
+    }
+
+    pub fn center_at(self: &mut Self, p: Position) {
+        self.r.center_at(p.x as i32, p.y as i32);
+    }
+
+    pub fn transform(self: &Self, p: Pos) -> Pos {
+        Pos { x: p.x - self.r.left(), y: p.y - self.r.top() }
+    }
+
+    pub fn into_iter(self: &Self) -> RectIter {
+        self.r.into_iter()
+    }
+
+    pub fn visible(self: &Self, p: Pos) -> bool {
+        self.r.is_enclosed(p)
+    }
 }

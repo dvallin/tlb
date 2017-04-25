@@ -20,8 +20,10 @@ use tcod::colors::{ self };
 use tilemap::{ TileMap };
 
 use components::appearance::{ Renderable };
-use components::space::{ Position };
+use components::space::{ Position, Viewport };
 use components::player::{ Player, Fov };
+
+use geometry::{ Pos };
 
 use systems::player_controller::{ PlayerController };
 
@@ -53,6 +55,8 @@ impl State for Game {
 
         self.create_player(1, 15.0, 15.0, true, tcod, world);
         self.create_player(2, 16.0, 16.0, false, tcod, world);
+        let viewport = Viewport::new(15, 15, 80, 40);
+        world.add_resource::<Viewport>(viewport);
     }
 
     fn handle_events(&mut self, world: &mut World) -> Transition {
@@ -84,16 +88,20 @@ impl State for Game {
         let renderables = world.read::<Renderable>();
         let positions = world.read::<Position>();
         let tilemap = world.read_resource::<TileMap>();
+        let viewport = world.read_resource::<Viewport>();
         let bgcolor = colors::BLACK;
 
         tcod.clear();
 
         {
-            tilemap.draw(tcod);
+            tilemap.draw(tcod, &viewport);
 
             for (renderable, _entity, position) in (&renderables, &entities, &positions).iter() {
-                tcod.render(position.x as i32, position.y as i32,
-                            bgcolor, renderable.color, renderable.character);
+                let p = Pos { x: position.x as i32, y: position.y as i32 };
+                if viewport.visible(p) {
+                    let pos = viewport.transform(p);
+                    tcod.render(pos.x, pos.y, bgcolor, renderable.color, renderable.character);
+                }
             }
         }
 

@@ -46,6 +46,23 @@ impl Rect {
             y2: y + h,
         }
     }
+
+    pub fn center_at(self: &mut Rect, x: i32, y: i32) {
+        let w = self.x2 - self.x1;
+        let h = self.y2 - self.y1;
+        self.x1 = x - w/2;
+        self.x2 = self.x1 + w;
+        self.y1 = y - h/2;
+        self.y2 = self.y1 + h;
+    }
+
+    pub fn top(self: &Rect) -> i32 {
+        self.y1
+    }
+
+    pub fn left(self: &Rect) -> i32 {
+        self.y1
+    }
 }
 
 impl Shape for Rect {
