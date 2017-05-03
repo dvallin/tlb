@@ -102,8 +102,8 @@ impl TileMap {
         self.create_room(&Rect::new(10, 25, 5, 5));
         self.create_room(&Rect::new(10, 12, 8, 8));
 
-        self.create_corridor(&Rect::new(11, 19, 2, 7));
-        self.create_corridor(&Rect::new(14, 27, 7, 2));
+        self.create_corridor(&Rect::new(10, 18, 3, 9));
+        self.create_corridor(&Rect::new(13, 27, 9, 3));
     }
 
     pub fn update(&mut self, tcod: &Tcod) {

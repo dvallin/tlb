@@ -15,7 +15,7 @@ pub trait Shape: Copy + IntoIterator<Item=Pos> {
     fn is_interior(&self, pos: Pos) -> bool;
 }
 
-#[derive(Copy, Clone)]
+#[derive(Copy, Clone, Debug, PartialEq)]
 pub struct Line {
     x1: i32,
     y1: i32,
@@ -23,7 +23,7 @@ pub struct Line {
     y2: i32,
 }
 
-#[derive(Copy, Clone)]
+#[derive(Copy, Clone, Debug, PartialEq)]
 pub struct Rect {
     x1: i32,
     y1: i32,
@@ -56,12 +56,29 @@ impl Rect {
         self.y2 = self.y1 + h;
     }
 
+    pub fn grow(self: &Rect, s: i32) -> Self {
+        Rect {
+            x1: self.x1 - s,
+            x2: self.x2 + s,
+            y1: self.y1 - s,
+            y2: self.y2 + s,
+        }
+    }
+
     pub fn top(self: &Rect) -> i32 {
         self.y1
     }
 
     pub fn left(self: &Rect) -> i32 {
-        self.y1
+        self.x1
+    }
+
+    pub fn bottom(self: &Rect) -> i32 {
+        self.y2 - 1
+    }
+
+    pub fn right(self: &Rect) -> i32 {
+        self.x2 - 1
     }
 }
 
@@ -77,15 +94,15 @@ impl Shape for Rect {
     }
 
     fn is_enclosed(&self, pos: Pos) -> bool {
-        pos.x >= self.x1 && pos.x <= self.x2 && pos.y >= self.y1 && pos.y <= self.y2
+        pos.x >= self.x1 && pos.x < self.x2 && pos.y >= self.y1 && pos.y < self.y2
     }
 
     fn is_boundary(&self, pos: Pos) -> bool {
-        pos.x == self.x1 || pos.x == self.x2 || pos.y == self.y1 || pos.y == self.y2
+        pos.x == self.x1 || pos.x == self.x2 - 1 || pos.y == self.y1 || pos.y == self.y2 - 1
     }
 
     fn is_interior(&self, pos: Pos) -> bool {
-        pos.x > self.x1 && pos.x < self.x2 && pos.y > self.y1 && pos.y < self.y2
+        pos.x > self.x1 && pos.x < self.x2 - 1 && pos.y > self.y1 && pos.y < self.y2 - 1
     }
 }
 
@@ -181,11 +198,11 @@ impl Iterator for RectIter {
     type Item = Pos;
     fn next(&mut self) -> Option<Pos> {
         self.pos.x += 1;
-        if self.pos.x > self.rect.x2 {
+        if self.pos.x >= self.rect.x2 {
             self.pos.x = self.rect.x1;
             self.pos.y += 1;
         }
-        if self.pos.y > self.rect.y2 {
+        if self.pos.y >= self.rect.y2 {
             None
         } else {
             Some(self.pos)

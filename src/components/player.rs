@@ -16,4 +16,3 @@ pub struct Fov {
 impl Component for Fov {
     type Storage = HashMapStorage<Fov>;
 }
-

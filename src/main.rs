@@ -5,6 +5,7 @@ extern crate num_cpus;
 mod engine;
 mod components;
 mod tilemap;
+mod ui;
 mod geometry;
 mod systems;
 
@@ -18,21 +19,24 @@ use engine::tcod::{ Tcod };
 use tcod::colors::{ self };
 
 use tilemap::{ TileMap };
+use ui::{ Ui };
 
 use components::appearance::{ Renderable };
 use components::space::{ Position, Viewport };
 use components::player::{ Player, Fov };
+use components::common::{ Stats, Description };
 
-use geometry::{ Pos };
+use geometry::{ Pos, Rect };
 
 use systems::player_controller::{ PlayerController };
+use systems::ui::{ UiUpdater };
 
 
 const TORCH_RADIUS: i32 = 10;
 struct Game;
 
 impl Game {
-    fn create_player(&mut self, index: usize, x: f32, y: f32, active: bool,
+    fn create_player(&mut self, index: usize, x: f32, y: f32, active: bool, name: String,
                      tcod: &mut Tcod, world: &mut World) {
         let fov_index = tcod.create_fov();
         tcod.initialize_fov(fov_index, world);
@@ -40,6 +44,8 @@ impl Game {
             .with(Position { x: x, y: y })
             .with(Renderable {character: '@', color: colors::WHITE })
             .with(Player {index: index, active: active})
+            .with(Stats {health: 100.0} )
+            .with(Description {name: name})
             .with(Fov { index: fov_index })
             .build();
     }
@@ -53,8 +59,14 @@ impl State for Game {
         map.build();
         world.add_resource::<TileMap>(map);
 
-        self.create_player(1, 15.0, 15.0, true, tcod, world);
-        self.create_player(2, 16.0, 16.0, false, tcod, world);
+        let mut ui = Ui::new();
+        ui.add("active_player".into(), Rect::new(1, 1, 11, 2));
+        ui.add("time".into(), Rect::new(34, 1, 11, 1));
+        ui.add("inactive_player".into(), Rect::new(57, 1, 11, 2));
+        world.add_resource::<Ui>(ui);
+
+        self.create_player(1, 15.0, 15.0, true, "Colton".into(), tcod, world);
+        self.create_player(2, 16.0, 16.0, false, "Gage".into(), tcod, world);
         let viewport = Viewport::new(15, 15, 80, 40);
         world.add_resource::<Viewport>(viewport);
     }
@@ -88,13 +100,15 @@ impl State for Game {
         let renderables = world.read::<Renderable>();
         let positions = world.read::<Position>();
         let tilemap = world.read_resource::<TileMap>();
+        let ui = world.read_resource::<Ui>();
         let viewport = world.read_resource::<Viewport>();
         let bgcolor = colors::BLACK;
 
-        tcod.clear();
+        tcod.clear(bgcolor);
 
         {
             tilemap.draw(tcod, &viewport);
+            ui.draw(tcod);
 
             for (renderable, _entity, position) in (&renderables, &entities, &positions).iter() {
                 let p = Pos { x: position.x as i32, y: position.y as i32 };
@@ -113,7 +127,10 @@ fn main() {
     ApplicationBuilder::new(Game)
         .register::<Player>()
         .register::<Fov>()
+        .register::<Description>()
+        .register::<Stats>()
         .with::<PlayerController>(PlayerController, "player_controller_system", 1)
+        .with::<UiUpdater>(UiUpdater, "ui_updater_system", 2)
         .build()
         .run();
 
