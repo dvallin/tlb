@@ -63,7 +63,7 @@ pub fn get_type(item: &Item) -> (Type, Rarity) {
         ItemInstance::Lighter | ItemInstance::Watch
             => (Type::Item, Rarity::Common),
         ItemInstance::HitachiRam
-            => (Type::Item, Rarity::Uncommon),
+            => (Type::Item, Rarity::Epic),
 
         ItemInstance::PocketVtr
             => (Type::Equipment, Rarity::Uncommon),

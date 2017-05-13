@@ -17,9 +17,10 @@ impl Component for Inventory {
 }
 
 impl Inventory {
-    pub fn add(&mut self, entity: Entity) {
+    pub fn push(&mut self, entity: Entity) {
         self.items.push(entity);
     }
+
     pub fn pop(&mut self) -> Option<Entity> {
         self.items.pop()
     }

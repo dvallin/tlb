@@ -20,8 +20,12 @@ impl InputHandler {
         }
     }
 
-    pub fn is_char_pressed(&self, key: char) -> bool {
+    pub fn is_char_down(&self, key: char) -> bool {
         self.pressed_keys.contains(&key)
+    }
+
+    pub fn is_char_pressed(&self, key: char) -> bool {
+        self.key.printable == key && self.key.pressed
     }
 
     pub fn is_key_pressed(&self, key: KeyCode) -> bool {

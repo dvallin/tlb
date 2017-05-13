@@ -99,7 +99,7 @@ impl Game {
 fn render_into_viewport(viewport: &Viewport, bgcolor: tcod::Color, position: &Position,
                         renderable: &Renderable, tcod: &mut Tcod) {
     let p = Pos { x: position.x as i32, y: position.y as i32 };
-    if viewport.visible(p) {
+    if viewport.visible(p) && tcod.is_in_fov(p.x, p.y) {
         let pos = viewport.transform(p);
         tcod.render(pos.x, pos.y, bgcolor, renderable.color, renderable.character);
     }
@@ -116,6 +116,9 @@ impl State for Game {
         world.add_resource::<ItemMap>(ItemMap::new());
 
         self.create_item(14.0, 15.0, ItemInstance::FlickKnife, world);
+        self.create_item(33.0, 25.0, ItemInstance::Simstim, world);
+        self.create_item(23.0, 25.0, ItemInstance::HitachiRam, world);
+        self.create_item(28.0, 21.0, ItemInstance::Shuriken, world);
 
         self.create_player(15.0, 15.0, true, "Colton".into(), tcod, world);
         self.create_player(16.0, 16.0, false, "Gage".into(), tcod, world);
@@ -124,7 +127,8 @@ impl State for Game {
 
         let mut ui = Ui::new();
         ui.add("active_player".into(), Rect::new(1, 1, 11, 2));
-        ui.add("time_left".into(), Rect::new(34, 1, 11, 1));
+        ui.add("time_left".into(), Rect::new(24, 1, 11, 1));
+        ui.add("inventory".into(), Rect::new(38, 1, 21, 5));
         ui.add("inactive_player".into(), Rect::new(67, 1, 11, 2));
         world.add_resource::<Ui>(ui);
 

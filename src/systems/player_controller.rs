@@ -18,16 +18,16 @@ unsafe impl Sync for PlayerController {}
 fn move_player(position: &mut Position, input: &InputHandler, delta_time: f32) -> Position {
     // move players
     let mut delta = Vector { x: 0.0, y: 0.0 };
-    if input.is_char_pressed('h') {
+    if input.is_char_down('h') {
         delta.x -= 1.0;
     }
-    if input.is_char_pressed('j') {
+    if input.is_char_down('j') {
         delta.y += 1.0;
     }
-    if input.is_char_pressed('k') {
+    if input.is_char_down('k') {
         delta.y -= 1.0;
     }
-    if input.is_char_pressed('l') {
+    if input.is_char_down('l') {
         delta.x += 1.0;
     }
     *position + mul(delta.norm(), delta_time*PLAYER_SPEED)
@@ -101,13 +101,13 @@ impl System<()> for PlayerController {
                     // player interaction
                     if input.is_char_pressed('p') {
                         if let Some(item_id) = item_map.pop(p.x as i32, p.y as i32) {
-                            inventory.add(item_id);
+                            inventory.push(item_id);
                             positions.remove(item_id);
                         }
                     } else if input.is_char_pressed('d') {
                         if let Some(item_id) = inventory.pop() {
-                            positions.insert(item_id, p);
                             item_map.push(&item_id, p.x as i32, p.y as i32);
+                            positions.insert(item_id, p);
                         }
                     }
                 }
