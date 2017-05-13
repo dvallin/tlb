@@ -1,4 +1,4 @@
-use std::ops::{ AddAssign };
+use std::ops::{ AddAssign, Add };
 use specs::{ Component, VecStorage };
 use geometry::{ Rect, Pos, Shape, RectIter };
 
@@ -37,6 +37,16 @@ impl AddAssign<Vector> for Position {
     fn add_assign(&mut self, rhs: Vector) {
         self.x += rhs.x;
         self.y += rhs.y;
+    }
+}
+
+impl Add<Vector> for Position {
+    type Output = Position;
+    fn add(self, rhs: Vector) -> Position {
+        Position {
+            x: self.x + rhs.x,
+            y: self.y + rhs.y,
+        }
     }
 }
 
