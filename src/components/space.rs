@@ -50,6 +50,7 @@ impl Add<Vector> for Position {
     }
 }
 
+
 impl Component for Position {
     type Storage = VecStorage<Position>;
 }

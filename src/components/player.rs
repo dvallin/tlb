@@ -1,8 +1,9 @@
 use specs::{ Component, HashMapStorage };
+use components::space::{ Position };
 
 pub struct Player {
     pub active: bool,
-    pub index: usize,
+    pub spawn: Position,
 }
 
 impl Component for Player {
