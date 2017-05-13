@@ -8,7 +8,7 @@ use engine::state::{ StateMachine, State };
 use engine::tcod::{ Tcod };
 use engine::time::{ Time, Stopwatch };
 
-use components::appearance::{ Renderable };
+use components::appearance::{ Renderable, Layer0, Layer1 };
 use components::space::{ Position };
 
 pub struct Application {
@@ -38,6 +38,9 @@ impl Application {
             world.add_resource::<Time>(time);
 
             world.register::<Renderable>();
+            world.register::<Layer0>();
+            world.register::<Layer1>();
+
             world.register::<Position>();
         }
 
