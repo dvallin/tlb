@@ -1,5 +1,7 @@
 use specs::{ System, RunArg, Join };
 
+use tcod::input::{ KeyCode };
+
 use components::space::{ Position, Vector, Viewport, mul };
 use components::player::{ Player };
 use components::inventory::{ Inventory };
@@ -16,16 +18,16 @@ unsafe impl Sync for PlayerController {}
 fn move_player(position: &mut Position, input: &InputHandler, delta_time: f32) -> Position {
     // move players
     let mut delta = Vector { x: 0.0, y: 0.0 };
-    if input.is_pressed('h') {
+    if input.is_char_pressed('h') {
         delta.x -= 1.0;
     }
-    if input.is_pressed('j') {
+    if input.is_char_pressed('j') {
         delta.y += 1.0;
     }
-    if input.is_pressed('k') {
+    if input.is_char_pressed('k') {
         delta.y -= 1.0;
     }
-    if input.is_pressed('l') {
+    if input.is_char_pressed('l') {
         delta.x += 1.0;
     }
     *position + mul(delta.norm(), delta_time*PLAYER_SPEED)
@@ -48,25 +50,36 @@ impl System<()> for PlayerController {
 
         let delta_time = time.delta_time.subsec_nanos() as f32 / 1.0e9;
 
-        // switch players
-        let mut switch_player : Option<usize> = None;
-        if input.is_pressed('1') {
-            switch_player = Some(1);
-        } else if input.is_pressed('2') {
-            switch_player = Some(2);
-        }
-
         let mut active_player = None;
-        if let Some(index) = switch_player {
-            for player in (&mut players).iter() {
-                player.active = player.index == index;
+        if input.is_key_pressed(KeyCode::Tab) {
+            // rotate players
+            let mut take_first = true;
+            let mut active_player_seen = false;
+            for (id, player) in (&entities, &mut players).iter() {
+                if active_player_seen {
+                    player.active = true;
+                    active_player = Some(id);
+                    take_first = false;
+                    break;
+                }
+                if player.active {
+                    player.active = false;
+                    active_player_seen = true;
+                }
             }
-        }
-
-
-        for (id, player) in (&entities, &mut players).iter() {
-            if player.active {
-                active_player = Some(id);
+            if take_first {
+                for (id, player) in (&entities, &mut players).iter() {
+                    player.active = true;
+                    active_player = Some(id);
+                    break;
+                }
+            }
+        } else {
+            for (id, player) in (&entities, &mut players).iter() {
+                if player.active {
+                    active_player = Some(id);
+                    break;
+                }
             }
         }
 
@@ -78,20 +91,20 @@ impl System<()> for PlayerController {
                     *p = np;
                 }
                 position = Some(p.clone());
-                // center at player
             }
 
             if let Some(p) = position {
+                // center at player
                 viewport.center_at(p);
 
                 if let Some(inventory) = inventories.get_mut(id) {
                     // player interaction
-                    if input.is_pressed('p') {
+                    if input.is_char_pressed('p') {
                         if let Some(item_id) = item_map.pop(p.x as i32, p.y as i32) {
                             inventory.add(item_id);
                             positions.remove(item_id);
                         }
-                    } else if input.is_pressed('d') {
+                    } else if input.is_char_pressed('d') {
                         if let Some(item_id) = inventory.pop() {
                             positions.insert(item_id, p);
                             item_map.push(&item_id, p.x as i32, p.y as i32);

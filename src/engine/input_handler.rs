@@ -1,25 +1,31 @@
 use std::collections::HashSet;
-use tcod::input::{ self, Event, Mouse, Key };
+use tcod::input::{ self, Event, Mouse, Key, KeyCode };
 
 #[derive(Default)]
 pub struct InputHandler {
     pub mouse: Mouse,
     pub key: Key,
-    pub pressed_keys: HashSet<char>
+    pub pressed_keys: HashSet<char>,
 }
 
 impl InputHandler {
     fn register_key(&mut self, key: Key) {
         self.key = key;
-        if key.pressed {
-            self.pressed_keys.insert(key.printable);
-        } else {
-            self.pressed_keys.remove(&key.printable);
+        if key.code == KeyCode::Char {
+            if key.pressed {
+                self.pressed_keys.insert(key.printable);
+            } else {
+                self.pressed_keys.remove(&key.printable);
+            }
         }
     }
 
-    pub fn is_pressed(&self, key: char) -> bool {
+    pub fn is_char_pressed(&self, key: char) -> bool {
         self.pressed_keys.contains(&key)
+    }
+
+    pub fn is_key_pressed(&self, key: KeyCode) -> bool {
+        self.key.code == key && self.key.pressed
     }
 
     pub fn update(&mut self) {
