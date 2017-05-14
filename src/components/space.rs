@@ -9,6 +9,12 @@ pub struct Position {
 }
 
 #[derive(Copy, Clone)]
+pub struct Spawn {
+    pub x: f32,
+    pub y: f32,
+}
+
+#[derive(Copy, Clone)]
 pub struct Vector {
     pub x: f32,
     pub y: f32,
@@ -50,6 +56,10 @@ impl Add<Vector> for Position {
     }
 }
 
+
+impl Component for Spawn {
+    type Storage = VecStorage<Spawn>;
+}
 
 impl Component for Position {
     type Storage = VecStorage<Position>;

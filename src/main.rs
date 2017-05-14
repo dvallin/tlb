@@ -10,7 +10,6 @@ mod ui;
 mod geometry;
 mod systems;
 mod maps;
-mod items;
 mod game_stats;
 
 use specs::{ World, Join };
@@ -28,8 +27,10 @@ use game_stats::{ GameStats };
 use ui::{ Ui };
 
 use components::appearance::{ Renderable, Layer0, Layer1 };
-use components::space::{ Position, Viewport };
+use components::space::{ Position, Spawn, Viewport };
 use components::player::{ Player, Fov };
+use components::npc::{ Npc, NpcInstance };
+use components::item::{ Item, ItemInstance };
 use components::common::{ Active, Health, Description };
 use components::inventory::{ Inventory };
 
@@ -38,8 +39,6 @@ use geometry::{ Pos, Rect };
 use systems::player_controller::{ PlayerController };
 use systems::round_scheduler::{ RoundScheduler };
 use systems::ui::{ UiUpdater };
-
-use items::{ Item, ItemInstance };
 
 const TORCH_RADIUS: i32 = 10;
 struct Game;
@@ -50,32 +49,42 @@ impl Game {
         let fov_index = tcod.create_fov();
         tcod.initialize_fov(fov_index, world);
 
-        let pos = Position { x: x, y: y };
-        let p = Player { spawn: pos };
         let mut builder = world.create_now()
+            .with(Player)
+            .with(Spawn { x: x, y: y })
             .with(Renderable { character: '@', color: colors::WHITE })
             .with(Health { health: 100.0 } )
             .with(Description { name: name, description: "".into() })
             .with(Fov { index: fov_index })
             .with(Inventory::new())
-            .with(Layer1)
-            .with(p)
-            .with(pos);
+            .with(Layer1);
         if active {
             builder = builder.with(Active);
         }
         builder.build();
     }
 
-    fn create_item(&mut self, x: f32, y: f32, instance: ItemInstance, world: &mut World) {
-        let pos = Position { x: x, y: y };
-        let i = Item { instance: instance, spawn: pos };
+    fn create_npc(&mut self, x: f32, y: f32, instance: NpcInstance, world: &mut World) {
+        let n = Npc { instance: instance };
         world.create_now()
-            .with(items::get_renderable(&i))
-            .with(items::get_description(&i))
-            .with(Layer0)
+            .with(Spawn { x: x, y: y })
+            .with(components::npc::get_renderable(&n))
+            .with(components::npc::get_description(&n))
+            .with(components::npc::get_health(&n))
+            .with(components::npc::get_inventory(&n))
+            .with(n)
+            .with(Layer1)
+            .build();
+    }
+
+    fn create_item(&mut self, x: f32, y: f32, instance: ItemInstance, world: &mut World) {
+        let i = Item { instance: instance };
+        world.create_now()
+            .with(Spawn { x: x, y: y })
+            .with(components::item::get_renderable(&i))
+            .with(components::item::get_description(&i))
             .with(i)
-            .with(pos)
+            .with(Layer0)
             .build();
     }
 
@@ -85,18 +94,24 @@ impl Game {
         let mut positions = world.write::<Position>();
         let mut maps = world.write_resource::<Maps>();
 
+        let spawns = world.read::<Spawn>();
         let players = world.read::<Player>();
+        let npcs = world.read::<Npc>();
         let items = world.read::<Item>();
 
         maps.clear_all();
-        for (id, player, position) in (&entities, &players, &mut positions).iter() {
-            *position = Position { x: player.spawn.x, y: player.spawn.y };
-            maps.push(Map::Character, &id, player.spawn.x as i32, player.spawn.y as i32);
+        for (id, spawn) in (&entities, &spawns).iter() {
+            positions.insert(id, Position { x: spawn.x, y: spawn.y });
         }
 
-        for (id, item, position) in (&entities, &items, &mut positions).iter() {
-            *position = Position { x: item.spawn.x, y: item.spawn.y };
-            maps.push(Map::Item, &id, item.spawn.x as i32, item.spawn.y as i32);
+        for (id, _, pos) in (&entities, &players, &mut positions).iter() {
+            maps.push(Map::Character, &id, pos.x as i32, pos.y as i32);
+        }
+        for (id, _, pos) in (&entities, &npcs, &mut positions).iter() {
+            maps.push(Map::Character, &id, pos.x as i32, pos.y as i32);
+        }
+        for (id, _, pos) in (&entities, &items, &mut positions).iter() {
+            maps.push(Map::Item, &id, pos.x as i32, pos.y as i32);
         }
 
         stats.reset();
@@ -120,13 +135,17 @@ impl State for Game {
         maps.build();
         world.add_resource::<Maps>(maps);
 
+        self.create_player(15.0, 15.0, true, "Colton".into(), tcod, world);
+        self.create_player(16.0, 16.0, false, "Gage".into(), tcod, world);
+
+        self.create_npc(31.0, 24.0, NpcInstance::Guard, world);
+        self.create_npc(29.0, 24.0, NpcInstance::Technician, world);
+        self.create_npc(31.0, 29.0, NpcInstance::Accountant, world);
+
         self.create_item(14.0, 15.0, ItemInstance::FlickKnife, world);
         self.create_item(33.0, 25.0, ItemInstance::Simstim, world);
         self.create_item(23.0, 25.0, ItemInstance::HitachiRam, world);
         self.create_item(28.0, 21.0, ItemInstance::Shuriken, world);
-
-        self.create_player(15.0, 15.0, true, "Colton".into(), tcod, world);
-        self.create_player(16.0, 16.0, false, "Gage".into(), tcod, world);
 
         let mut ui = Ui::new();
         ui.add("active_player".into(), Rect::new(1, 1, 11, 2));
@@ -202,6 +221,8 @@ impl State for Game {
 fn main() {
     ApplicationBuilder::new(Game)
         .register::<Player>()
+        .register::<Npc>()
+        .register::<Spawn>()
         .register::<Item>()
         .register::<Fov>()
         .register::<Description>()
