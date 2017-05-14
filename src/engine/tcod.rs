@@ -73,6 +73,12 @@ impl Tcod {
         self.panel.clear();
     }
 
+    pub fn switch_fullscreen(&mut self) {
+        let fullscreen = self.root.is_fullscreen();
+        println!("Switching fullscreen {}", !fullscreen);
+        self.root.set_fullscreen(!fullscreen);
+    }
+
     pub fn flush(&mut self) {
         self.root.clear();
         blit(&mut self.console, (0, 0), (MAP_WIDTH, MAP_HEIGHT),
@@ -90,6 +96,11 @@ impl Tcod {
     pub fn render(&mut self, x: i32, y: i32, bgcolor: Color, fgcolor: Color, character: char) {
         self.console.set_default_foreground(fgcolor);
         self.console.set_char_background(x, y, bgcolor, BackgroundFlag::Set);
+        self.console.put_char(x, y, character, BackgroundFlag::None);
+    }
+
+    pub fn render_character(&mut self, x: i32, y: i32, fgcolor: Color, character: char) {
+        self.console.set_default_foreground(fgcolor);
         self.console.put_char(x, y, character, BackgroundFlag::None);
     }
 

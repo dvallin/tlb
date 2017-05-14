@@ -96,12 +96,11 @@ impl Game {
     }
 }
 
-fn render_into_viewport(viewport: &Viewport, bgcolor: tcod::Color, position: &Position,
-                        renderable: &Renderable, tcod: &mut Tcod) {
+fn render_into_viewport(viewport: &Viewport, position: &Position, renderable: &Renderable, tcod: &mut Tcod) {
     let p = Pos { x: position.x as i32, y: position.y as i32 };
     if viewport.visible(p) && tcod.is_in_fov(p.x, p.y) {
         let pos = viewport.transform(p);
-        tcod.render(pos.x, pos.y, bgcolor, renderable.color, renderable.character);
+        tcod.render_character(pos.x, pos.y, renderable.color, renderable.character);
     }
 }
 
@@ -136,11 +135,13 @@ impl State for Game {
         world.add_resource::<Viewport>(viewport);
     }
 
-    fn handle_events(&mut self, world: &mut World) -> Transition {
+    fn handle_events(&mut self, tcod: &mut Tcod, world: &mut World) -> Transition {
         let mut input = world.write_resource::<InputHandler>();
         input.update();
         if input.is_key_pressed(KeyCode::Escape) {
             return Transition::Exit
+        } else if input.is_key_pressed(KeyCode::F5) {
+            tcod.switch_fullscreen();
         }
         Transition::None
     }
@@ -176,19 +177,18 @@ impl State for Game {
         let tilemap = world.read_resource::<TileMap>();
         let ui = world.read_resource::<Ui>();
         let viewport = world.read_resource::<Viewport>();
-        let bgcolor = colors::BLACK;
 
-        tcod.clear(bgcolor);
+        tcod.clear(colors::BLACK);
 
         {
             tilemap.draw(tcod, &viewport);
             ui.draw(tcod);
 
             for (_, renderable, position) in (&layer0, &renderables, &positions).iter() {
-                render_into_viewport(&viewport, bgcolor, position, renderable, tcod);
+                render_into_viewport(&viewport, position, renderable, tcod);
             }
             for (_, renderable, position) in (&layer1, &renderables, &positions).iter() {
-               render_into_viewport(&viewport, bgcolor, position, renderable, tcod);
+               render_into_viewport(&viewport, position, renderable, tcod);
             }
         }
 

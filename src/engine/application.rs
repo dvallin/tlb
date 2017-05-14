@@ -75,7 +75,7 @@ impl Application {
                 time.fixed_step = self.fixed_step;
             }
 
-            self.state.handle_events(world);
+            self.state.handle_events(&mut self.tcod, world);
             if self.last_fixed_update.elapsed() >= self.fixed_step {
                 self.state.fixed_update(&mut self.tcod, world);
                 self.last_fixed_update += self.fixed_step;

@@ -3,11 +3,17 @@ use engine::tcod::{ Tcod };
 
 pub enum Transition {
     None,
+    Pop,
+    Push(Box<State>),
+    Switch(Box<State>),
     Exit,
 }
 
 pub trait State {
-    fn start(&mut self, tcod: &mut Tcod, world: &mut World);
+    fn start(&mut self, _tcod: &mut Tcod, _world: &mut World) {}
+    fn stop(&mut self, _tcod: &mut Tcod, _world: &mut World) {}
+    fn pause(&mut self, _tcod: &mut Tcod, _world: &mut World) {}
+    fn resume(&mut self, _tcod: &mut Tcod, _world: &mut World) {}
 
     fn update(&mut self, _tcod: &mut Tcod, _world: &mut World) -> Transition {
         Transition::None
@@ -17,7 +23,7 @@ pub trait State {
         Transition::None
     }
 
-    fn handle_events(&mut self, _world: &mut World) -> Transition {
+    fn handle_events(&mut self, _tcod: &mut Tcod, _world: &mut World) -> Transition {
         Transition::None
     }
 
@@ -55,7 +61,7 @@ impl StateMachine {
                 Some(state) => state.update(tcod, world),
                 None => Transition::None,
             };
-            self.transition(transition, world)
+            self.transition(transition, tcod, world)
         }
     }
 
@@ -65,7 +71,7 @@ impl StateMachine {
                 Some(state) => state.fixed_update(tcod, world),
                 None => Transition::None,
             };
-            self.transition(transition, world)
+            self.transition(transition, tcod, world)
         }
     }
 
@@ -76,27 +82,70 @@ impl StateMachine {
         }
     }
 
-    pub fn handle_events(&mut self, world: &mut World) {
+    pub fn handle_events(&mut self, tcod: &mut Tcod, world: &mut World) {
         if self.running {
             let transition = match self.states.last_mut() {
-                Some(state) => state.handle_events(world),
+                Some(state) => state.handle_events(tcod, world),
                 None => Transition::None,
             };
-            self.transition(transition, world)
+            self.transition(transition, tcod, world)
         }
     }
 
-    fn transition(&mut self, transition: Transition, world: &mut World) {
+    fn transition(&mut self, transition: Transition, tcod: &mut Tcod, world: &mut World) {
         if self.running {
             match transition {
                 Transition::None => (),
-                Transition::Exit => self.stop(world),
+                Transition::Pop => self.pop(tcod, world),
+                Transition::Push(state) => self.push(tcod, world, state),
+                Transition::Switch(state) => self.switch(tcod, world, state),
+                Transition::Exit => self.stop(tcod, world),
             }
         }
     }
 
-    fn stop(&mut self, _world: &mut World) {
-        self.running = false;
+    fn push(&mut self, tcod: &mut Tcod, world: &mut World, state: Box<State>) {
+        if self.running {
+            if let Some(mut state) = self.states.last_mut() {
+                state.pause(tcod, world);
+            }
+            self.states.push(state);
+            let state = self.states.last_mut().unwrap();
+            state.start(tcod, world);
+        }
+    }
+
+    fn switch(&mut self, tcod: &mut Tcod, world: &mut World, state: Box<State>) {
+        if self.running {
+            if let Some(mut state) = self.states.pop() {
+                state.pause(tcod, world);
+            }
+            self.states.push(state);
+            let state = self.states.last_mut().unwrap();
+            state.start(tcod, world);
+        }
+    }
+
+    fn pop(&mut self, tcod: &mut Tcod, world: &mut World) {
+        if self.running {
+            if let Some(mut state) = self.states.pop() {
+                state.stop(tcod, world);
+            }
+            if let Some(mut state) = self.states.last_mut() {
+                state.resume(tcod, world);
+            } else {
+                self.running = false;
+            }
+        }
+    }
+
+    fn stop(&mut self, tcod: &mut Tcod, world: &mut World) {
+        if self.running {
+            while let Some(mut state) = self.states.pop() {
+                state.stop(tcod, world);
+            }
+            self.running = false;
+        }
     }
 }
 
