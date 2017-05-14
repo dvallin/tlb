@@ -6,7 +6,7 @@ use tcod::colors::{ Color };
 
 use specs::{ World };
 
-use tilemap::{ TileMap };
+use maps::{ Maps };
 use geometry::{ Rect };
 
 const SCREEN_WIDTH: i32 = 80;
@@ -56,11 +56,11 @@ impl Tcod {
     }
 
     pub fn initialize_fov(&mut self, index: usize, world: &mut World) {
-        let tilemap = world.read_resource::<TileMap>();
+        let maps = world.read_resource::<Maps>();
         for y in 0..MAP_HEIGHT {
             for x in 0..MAP_WIDTH {
-                let see_through = !tilemap.is_sight_blocking(x, y);
-                let walk_through = !tilemap.is_blocking(x, y);
+                let see_through = !maps.is_sight_blocking(x, y);
+                let walk_through = !maps.is_blocking(x, y);
                 self.fov[index].set(x, y, see_through, walk_through);
             }
         }

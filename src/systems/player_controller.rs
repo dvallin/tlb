@@ -1,15 +1,13 @@
 use specs::{ System, RunArg, Join };
 
-use tcod::input::{ KeyCode };
-
 use components::space::{ Position, Vector, Viewport, mul };
 use components::player::{ Player };
 use components::common::{ Active };
 use components::inventory::{ Inventory };
 use engine::input_handler::{ InputHandler };
 use engine::time::{ Time };
-use tilemap::{ TileMap };
-use itemmap::{ ItemMap };
+
+use maps::{ Maps };
 
 const PLAYER_SPEED: f32 = 4.0;
 
@@ -37,7 +35,7 @@ fn move_player(position: &mut Position, input: &InputHandler, delta_time: f32) -
 impl System<()> for PlayerController {
     fn run(&mut self, arg: RunArg, _: ()) {
         let (entities, players, actives, mut positions, mut inventories,
-             time, input, tile_map, mut item_map, mut viewport) = arg.fetch(|w| {
+             time, input, mut maps, mut viewport) = arg.fetch(|w| {
                  (w.entities(),
                   w.read::<Player>(),
                   w.read::<Active>(),
@@ -45,8 +43,7 @@ impl System<()> for PlayerController {
                   w.write::<Inventory>(),
                   w.read_resource::<Time>(),
                   w.read_resource::<InputHandler>(),
-                  w.read_resource::<TileMap>(),
-                  w.write_resource::<ItemMap>(),
+                  w.write_resource::<Maps>(),
                   w.write_resource::<Viewport>())
         });
 
@@ -54,7 +51,7 @@ impl System<()> for PlayerController {
 
         for (p, _, _) in (&mut positions, &players, &actives).iter() {
             let np = move_player(p, &input, delta_time);
-            if !tile_map.is_blocking(np.x as i32, np.y as i32) {
+            if !maps.is_blocking(np.x as i32, np.y as i32) {
                 *p = np;
             }
             // center at player
@@ -65,13 +62,13 @@ impl System<()> for PlayerController {
             let p = positions.get(id).unwrap().clone();
             // player interaction
             if input.is_char_pressed('p') {
-                if let Some(item_id) = item_map.pop(p.x as i32, p.y as i32) {
+                if let Some(item_id) = maps.pop_item(p.x as i32, p.y as i32) {
                     inventory.push(item_id);
                     positions.remove(item_id);
                 }
             } else if input.is_char_pressed('d') {
                 if let Some(item_id) = inventory.pop() {
-                    item_map.push(&item_id, p.x as i32, p.y as i32);
+                    maps.push_item(&item_id, p.x as i32, p.y as i32);
                     positions.insert(item_id, p);
                 }
             }

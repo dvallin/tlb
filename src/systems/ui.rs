@@ -23,19 +23,19 @@ impl System<()> for UiUpdater {
 
         ui.update("time_left".into(), UiData::Text{ text: stats.time_left().to_string() });
 
-        for (player, _, description, health) in (&players, &actives, &descriptions, &health).iter() {
+        for (_, _, description, health) in (&players, &actives, &descriptions, &health).iter() {
             ui.update("active_player".into(), UiData::MultiLine { text: vec![
                 description.name.clone(),
                 health.health.to_string()
             ]});
         }
-        for (player, _, description, health) in (&players, !&actives, &descriptions, &health).iter() {
+        for (_, _, description, health) in (&players, !&actives, &descriptions, &health).iter() {
             ui.update("inactive_player".into(), UiData::MultiLine { text: vec![
                 description.name.clone(),
                 health.health.to_string()
             ]});
         }
-        for (player, _, inventory) in (&players, &actives, &inventories).iter() {
+        for (_, _, inventory) in (&players, &actives, &inventories).iter() {
             ui.update("inventory".into(), UiData::MultiLine {
                 text: inventory.items.iter()
                     .filter_map(|item| descriptions.get(*item))

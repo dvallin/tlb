@@ -4,11 +4,13 @@ extern crate num_cpus;
 
 mod engine;
 mod components;
-mod tilemap;
+mod tile_map;
+mod entity_map;
 mod ui;
 mod geometry;
 mod systems;
-mod itemmap;
+mod maps;
+mod items;
 mod game_stats;
 
 use specs::{ World, Join };
@@ -21,7 +23,7 @@ use engine::tcod::{ Tcod };
 use tcod::colors::{ self };
 use tcod::input::{ KeyCode };
 
-use tilemap::{ TileMap };
+use maps::{ Maps };
 use game_stats::{ GameStats };
 use ui::{ Ui };
 
@@ -37,7 +39,7 @@ use systems::player_controller::{ PlayerController };
 use systems::round_scheduler::{ RoundScheduler };
 use systems::ui::{ UiUpdater };
 
-use itemmap::{ Item, ItemInstance, ItemMap };
+use items::{ Item, ItemInstance };
 
 const TORCH_RADIUS: i32 = 10;
 struct Game;
@@ -69,8 +71,8 @@ impl Game {
         let pos = Position { x: x, y: y };
         let i = Item { instance: instance, spawn: pos };
         world.create_now()
-            .with(itemmap::get_renderable(&i))
-            .with(itemmap::get_description(&i))
+            .with(items::get_renderable(&i))
+            .with(items::get_description(&i))
             .with(Layer0)
             .with(i)
             .with(pos)
@@ -81,7 +83,7 @@ impl Game {
         let entities = world.entities();
         let mut stats = world.write_resource::<GameStats>();
         let mut positions = world.write::<Position>();
-        let mut item_map = world.write_resource::<ItemMap>();
+        let mut maps = world.write_resource::<Maps>();
 
         let players = world.read::<Player>();
         let items = world.read::<Item>();
@@ -90,10 +92,10 @@ impl Game {
             *position = Position { x: player.spawn.x, y: player.spawn.y };
         }
 
-        item_map.clear();
+        maps.clear();
         for (id, item, position) in (&entities, &items, &mut positions).iter() {
             *position = Position { x: item.spawn.x, y: item.spawn.y };
-            item_map.push(&id, item.spawn.x as i32, item.spawn.y as i32);
+            maps.push_item(&id, item.spawn.x as i32, item.spawn.y as i32);
         }
 
         stats.reset();
@@ -112,11 +114,10 @@ impl State for Game {
     fn start(&mut self, tcod: &mut Tcod, world: &mut World) {
         world.add_resource::<InputHandler>(InputHandler::default());
         world.add_resource::<GameStats>(GameStats::default());
-
-        let mut tile_map = TileMap::new();
-        tile_map.build();
-        world.add_resource::<TileMap>(tile_map);
-        world.add_resource::<ItemMap>(ItemMap::new());
+        world.add_resource::<Viewport>(Viewport::new(15, 15, 80, 40));
+        let mut maps = Maps::new();
+        maps.build();
+        world.add_resource::<Maps>(maps);
 
         self.create_item(14.0, 15.0, ItemInstance::FlickKnife, world);
         self.create_item(33.0, 25.0, ItemInstance::Simstim, world);
@@ -126,8 +127,6 @@ impl State for Game {
         self.create_player(15.0, 15.0, true, "Colton".into(), tcod, world);
         self.create_player(16.0, 16.0, false, "Gage".into(), tcod, world);
 
-        self.reset_world(world);
-
         let mut ui = Ui::new();
         ui.add("active_player".into(), Rect::new(1, 1, 11, 2));
         ui.add("time_left".into(), Rect::new(24, 1, 11, 1));
@@ -135,8 +134,7 @@ impl State for Game {
         ui.add("inactive_player".into(), Rect::new(67, 1, 11, 2));
         world.add_resource::<Ui>(ui);
 
-        let viewport = Viewport::new(15, 15, 80, 40);
-        world.add_resource::<Viewport>(viewport);
+        self.reset_world(world);
     }
 
     fn handle_events(&mut self, tcod: &mut Tcod, world: &mut World) -> Transition {
@@ -163,11 +161,11 @@ impl State for Game {
 
         let fovs = world.read::<Fov>();
         let positions = world.read::<Position>();
-        let mut tilemap = world.write_resource::<TileMap>();
         for (fov, position) in (&fovs, &positions).iter() {
             tcod.compute_fov(fov.index, position.x as i32, position.y as i32, TORCH_RADIUS);
         }
 
+        let mut tilemap = world.write_resource::<Maps>();
         tilemap.update(tcod);
 
         Transition::None
@@ -178,14 +176,14 @@ impl State for Game {
         let positions = world.read::<Position>();
         let layer0 = world.read::<Layer0>();
         let layer1 = world.read::<Layer1>();
-        let tilemap = world.read_resource::<TileMap>();
+        let maps = world.read_resource::<Maps>();
         let ui = world.read_resource::<Ui>();
         let viewport = world.read_resource::<Viewport>();
 
         tcod.clear(colors::BLACK);
 
         {
-            tilemap.draw(tcod, &viewport);
+            maps.draw(tcod, &viewport);
             ui.draw(tcod);
 
             for (_, renderable, position) in (&layer0, &renderables, &positions).iter() {
