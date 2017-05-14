@@ -12,6 +12,10 @@ pub enum Stopwatch {
     Ended(Duration),
 }
 
+pub struct Timer {
+    deadline: Instant,
+}
+
 impl Default for Stopwatch {
     fn default() -> Self {
         Stopwatch::Waiting
@@ -45,5 +49,19 @@ impl Stopwatch {
         if let &mut Stopwatch::Started(duration, start) = self {
             *self = Stopwatch::Ended(duration + start.elapsed());
         }
+    }
+}
+
+impl Timer {
+    pub fn new(duration: Duration) -> Self {
+        Timer { deadline: Instant::now() + duration }
+    }
+
+    pub fn elapsed(&self) -> bool {
+        Instant::now() > self.deadline
+    }
+
+    pub fn time_left(&self) -> Duration {
+        self.deadline - Instant::now()
     }
 }
