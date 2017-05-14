@@ -28,12 +28,13 @@ use ui::{ Ui };
 use components::appearance::{ Renderable, Layer0, Layer1 };
 use components::space::{ Position, Viewport };
 use components::player::{ Player, Fov };
-use components::common::{ Health, Description };
+use components::common::{ Active, Health, Description };
 use components::inventory::{ Inventory };
 
 use geometry::{ Pos, Rect };
 
 use systems::player_controller::{ PlayerController };
+use systems::round_scheduler::{ RoundScheduler };
 use systems::ui::{ UiUpdater };
 
 use itemmap::{ Item, ItemInstance, ItemMap };
@@ -48,8 +49,8 @@ impl Game {
         tcod.initialize_fov(fov_index, world);
 
         let pos = Position { x: x, y: y };
-        let p = Player { active: active, spawn: pos };
-        world.create_now()
+        let p = Player { spawn: pos };
+        let mut builder = world.create_now()
             .with(Renderable { character: '@', color: colors::WHITE })
             .with(Health { health: 100.0 } )
             .with(Description { name: name, description: "".into() })
@@ -57,8 +58,11 @@ impl Game {
             .with(Inventory::new())
             .with(Layer1)
             .with(p)
-            .with(pos)
-            .build();
+            .with(pos);
+        if active {
+            builder = builder.with(Active);
+        }
+        builder.build();
     }
 
     fn create_item(&mut self, x: f32, y: f32, instance: ItemInstance, world: &mut World) {
@@ -202,9 +206,11 @@ fn main() {
         .register::<Item>()
         .register::<Fov>()
         .register::<Description>()
+        .register::<Active>()
         .register::<Inventory>()
         .register::<Health>()
         .with::<PlayerController>(PlayerController, "player_controller_system", 1)
+        .with::<RoundScheduler>(RoundScheduler, "round_scheduler_system", 1)
         .with::<UiUpdater>(UiUpdater, "ui_updater_system", 2)
         .build()
         .run();
