@@ -23,7 +23,7 @@ use engine::tcod::{ Tcod };
 use tcod::colors::{ self };
 use tcod::input::{ KeyCode };
 
-use maps::{ Maps };
+use maps::{ Maps, Map };
 use game_stats::{ GameStats };
 use ui::{ Ui };
 
@@ -88,14 +88,15 @@ impl Game {
         let players = world.read::<Player>();
         let items = world.read::<Item>();
 
-        for (player, position) in (&players, &mut positions).iter() {
+        maps.clear_all();
+        for (id, player, position) in (&entities, &players, &mut positions).iter() {
             *position = Position { x: player.spawn.x, y: player.spawn.y };
+            maps.push(Map::Character, &id, player.spawn.x as i32, player.spawn.y as i32);
         }
 
-        maps.clear();
         for (id, item, position) in (&entities, &items, &mut positions).iter() {
             *position = Position { x: item.spawn.x, y: item.spawn.y };
-            maps.push_item(&id, item.spawn.x as i32, item.spawn.y as i32);
+            maps.push(Map::Item, &id, item.spawn.x as i32, item.spawn.y as i32);
         }
 
         stats.reset();
