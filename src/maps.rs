@@ -28,7 +28,7 @@ impl Maps {
         self.tiles.is_blocking(x, y)
     }
 
-    pub fn is_passable(&self, entity: &Entity, x: i32, y: i32) -> bool {
+    pub fn is_impassable(&self, entity: &Entity, x: i32, y: i32) -> bool {
         self.tiles.is_blocking(x, y) || self.characters.get(x, y)
             .map(|e| e != *entity).unwrap_or(false)
     }
@@ -54,10 +54,18 @@ impl Maps {
         self.characters.clear();
     }
 
-    pub fn remove(&mut self, map: Map, entity: &Entity, x: i32, y: i32) -> Option<Entity> {
-        match map {
-            Map::Item => self.items.remove(entity, x, y),
-            Map::Character => self.characters.remove(entity, x, y),
+    pub fn move_entity(&mut self, map: Map, entity: &Entity, x1: i32, y1: i32, x2: i32, y2: i32) {
+        if x1 != x2 || y1 != y2 {
+            match map {
+                Map::Item => {
+                    self.items.remove(entity, x1, y1);
+                    self.items.push(entity, x2, y2);
+                },
+                Map::Character => {
+                    self.characters.remove(entity, x1, y1);
+                    self.characters.push(entity, x2, y2);
+                },
+            }
         }
     }
 

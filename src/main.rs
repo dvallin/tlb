@@ -31,12 +31,13 @@ use components::space::{ Position, Spawn, Viewport };
 use components::player::{ Player, Fov };
 use components::npc::{ Npc, NpcInstance };
 use components::item::{ Item, ItemInstance };
-use components::common::{ Active, Health, Description };
+use components::common::{ Active, MoveToPosition, Health, Description };
 use components::inventory::{ Inventory };
 
 use geometry::{ Pos, Rect };
 
 use systems::player_controller::{ PlayerController };
+use systems::move_to_controller::{ MoveToController };
 use systems::round_scheduler::{ RoundScheduler };
 use systems::ui::{ UiUpdater };
 
@@ -229,7 +230,9 @@ fn main() {
         .register::<Active>()
         .register::<Inventory>()
         .register::<Health>()
+        .register::<MoveToPosition>()
         .with::<PlayerController>(PlayerController, "player_controller_system", 1)
+        .with::<MoveToController>(MoveToController, "move_to_controller_system", 1)
         .with::<RoundScheduler>(RoundScheduler, "round_scheduler_system", 1)
         .with::<UiUpdater>(UiUpdater, "ui_updater_system", 2)
         .build()

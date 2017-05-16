@@ -1,3 +1,4 @@
+use components::space::{ Position };
 use specs::{ Component, HashMapStorage, VecStorage };
 
 pub struct Active;
@@ -11,12 +12,20 @@ pub struct Health {
     pub health: f32,
 }
 
+pub struct MoveToPosition {
+    pub position: Position,
+}
+
 pub struct Round {
     pub round: i32,
 }
 
 impl Component for Description {
     type Storage = VecStorage<Description>;
+}
+
+impl Component for MoveToPosition {
+    type Storage = VecStorage<MoveToPosition>;
 }
 
 impl Component for Active {

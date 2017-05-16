@@ -1,4 +1,4 @@
-use std::ops::{ AddAssign, Add };
+use std::ops::{ AddAssign, Add, Sub };
 use specs::{ Component, VecStorage };
 use geometry::{ Rect, Pos, Shape, RectIter };
 
@@ -56,6 +56,16 @@ impl Add<Vector> for Position {
     }
 }
 
+impl Sub<Position> for Position {
+    type Output = Vector;
+    fn sub(self, rhs: Position) -> Vector {
+        Vector {
+            x: self.x - rhs.x,
+            y: self.y - rhs.y,
+        }
+    }
+}
+
 
 impl Component for Spawn {
     type Storage = VecStorage<Spawn>;
@@ -82,6 +92,10 @@ impl Viewport {
 
     pub fn transform(self: &Self, p: Pos) -> Pos {
         Pos { x: p.x - self.r.left(), y: p.y - self.r.top() }
+    }
+
+    pub fn inv_transform(self: &Self, p: Pos) -> Pos {
+        Pos { x: p.x + self.r.left(), y: p.y + self.r.top() }
     }
 
     pub fn into_iter(self: &Self) -> RectIter {

@@ -1,4 +1,5 @@
 use std::collections::HashSet;
+use geometry::{ Pos };
 use tcod::input::{ self, Event, Mouse, Key, KeyCode };
 
 #[derive(Default)]
@@ -20,6 +21,18 @@ impl InputHandler {
         }
     }
 
+    fn register_mouse(&mut self, mouse: Mouse) {
+        self.mouse = mouse;
+    }
+
+    pub fn is_mouse_pressed(&self) -> bool {
+        self.mouse.lbutton_pressed
+    }
+
+    pub fn mouse_pos(&self) -> Pos {
+        Pos { x: self.mouse.cx as i32, y: self.mouse.cy as i32 }
+    }
+
     pub fn is_char_down(&self, key: char) -> bool {
         self.pressed_keys.contains(&key)
     }
@@ -34,9 +47,12 @@ impl InputHandler {
 
     pub fn update(&mut self) {
         match input::check_for_event(input::MOUSE | input::KEY_PRESS | input::KEY_RELEASE) {
-            Some((_, Event::Mouse(m))) => self.mouse = m,
+            Some((_, Event::Mouse(m))) => self.register_mouse(m),
             Some((_, Event::Key(k))) => self.register_key(k),
-            _ => self.key = Default::default(),
+            _ => {
+                self.key = Default::default();
+                self.mouse = Default::default();
+            },
         }
     }
 }
