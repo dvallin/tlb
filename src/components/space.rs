@@ -37,6 +37,10 @@ impl Vector {
             mul(self, 1.0/len)
         }
     }
+
+    pub fn dot(self, other: &Vector) -> f32 {
+        self.x * other.x + self.y * other.y
+    }
 }
 
 impl AddAssign<Vector> for Position {
@@ -66,6 +70,11 @@ impl Sub<Position> for Position {
     }
 }
 
+impl Position {
+    pub fn approx_equal(&self, other: &Position) -> bool {
+        (self.x - other.x).abs() < 1.0e-6 && (self.y - other.y).abs() < 1.0e-6
+    }
+}
 
 impl Component for Spawn {
     type Storage = VecStorage<Spawn>;

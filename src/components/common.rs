@@ -14,6 +14,7 @@ pub struct Health {
 
 pub struct MoveToPosition {
     pub position: Position,
+    pub speed: f32,
 }
 
 pub struct Round {

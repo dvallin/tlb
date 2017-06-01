@@ -11,6 +11,7 @@ mod geometry;
 mod systems;
 mod maps;
 mod game_stats;
+mod game_state;
 
 use specs::{ World, Join };
 
@@ -24,6 +25,7 @@ use tcod::input::{ KeyCode };
 
 use maps::{ Maps, Map };
 use game_stats::{ GameStats };
+use game_state::{ GameState };
 use ui::{ Ui };
 
 use components::appearance::{ Renderable, Layer0, Layer1 };
@@ -94,11 +96,14 @@ impl Game {
         let mut stats = world.write_resource::<GameStats>();
         let mut positions = world.write::<Position>();
         let mut maps = world.write_resource::<Maps>();
+        let mut state = world.write_resource::<GameState>();
 
         let spawns = world.read::<Spawn>();
         let players = world.read::<Player>();
         let npcs = world.read::<Npc>();
         let items = world.read::<Item>();
+
+        state.reset();
 
         maps.clear_all();
         for (id, spawn) in (&entities, &spawns).iter() {
@@ -131,6 +136,7 @@ impl State for Game {
     fn start(&mut self, tcod: &mut Tcod, world: &mut World) {
         world.add_resource::<InputHandler>(InputHandler::default());
         world.add_resource::<GameStats>(GameStats::default());
+        world.add_resource::<GameState>(GameState::default());
         world.add_resource::<Viewport>(Viewport::new(15, 15, 80, 40));
         let mut maps = Maps::new();
         maps.build();

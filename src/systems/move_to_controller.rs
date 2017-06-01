@@ -6,8 +6,6 @@ use engine::time::{ Time };
 
 use maps::{ Map, Maps };
 
-const PLAYER_SPEED: f32 = 4.0;
-
 pub struct MoveToController;
 unsafe impl Sync for MoveToController {}
 
@@ -28,9 +26,16 @@ impl System<()> for MoveToController {
 
         let mut finished_entities = vec![];
         for (id, p, t) in (&entities, &mut positions, &mut move_to_positions).iter() {
-            if p.x as i32 != t.position.x as i32 || p.y as i32 != t.position.y as i32 {
+            if !p.approx_equal(&t.position) {
                 let delta = t.position - *p;
-                let np = *p + mul(delta.norm(), delta_time*PLAYER_SPEED);
+                let mut np = *p + mul(delta.norm(), delta_time*t.speed);
+
+                // do not overshoot!
+                let delta_new = t.position - np;
+                if delta.dot(&delta_new) < 0.0 {
+                    np = t.position;
+                }
+
                 if !maps.is_impassable(&id, np.x as i32, np.y as i32) {
                     maps.move_entity(Map::Character, &id,
                                      p.x as i32, p.y as i32, np.x as i32, np.y as i32);
