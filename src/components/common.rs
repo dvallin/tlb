@@ -1,7 +1,6 @@
 use components::space::{ Position };
 use specs::{ Component, HashMapStorage, VecStorage };
 
-pub struct Active;
 
 pub struct Description {
     pub name: String,
@@ -17,10 +16,6 @@ pub struct MoveToPosition {
     pub speed: f32,
 }
 
-pub struct Round {
-    pub round: i32,
-}
-
 impl Component for Description {
     type Storage = VecStorage<Description>;
 }
@@ -29,16 +24,22 @@ impl Component for MoveToPosition {
     type Storage = VecStorage<MoveToPosition>;
 }
 
-impl Component for Active {
-    type Storage = HashMapStorage<Active>;
-}
 
 impl Component for Health {
     type Storage = HashMapStorage<Health>;
 }
 
-impl Component for Round {
-    type Storage = HashMapStorage<Round>;
+pub struct WaitForTurn;
+pub struct Active;
+pub struct TookTurn;
+impl Component for WaitForTurn {
+    type Storage = HashMapStorage<WaitForTurn>;
+}
+impl Component for Active {
+    type Storage = HashMapStorage<Active>;
+}
+impl Component for TookTurn {
+    type Storage = HashMapStorage<TookTurn>;
 }
 
 impl Description {
