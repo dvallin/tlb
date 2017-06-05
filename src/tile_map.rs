@@ -4,7 +4,7 @@ use tcod::colors::{ self, Color };
 use tcod::chars::{ self };
 
 use components::space::{ Viewport };
-use geometry::{ Shape, Line, Rect, Pos };
+use geometry::{ Shape, Line, Rect };
 
 const MAP_WIDTH: i32 = 80;
 const MAP_HEIGHT: i32 = 43;
@@ -109,7 +109,7 @@ impl TileMap {
     pub fn update(&mut self, tcod: &Tcod) {
         for y in 0..self.height {
             for x in 0..self.width {
-                let visible = tcod.is_in_fov(x,y);
+                let visible = tcod.is_in_fov((x,y));
                 self.map[x as usize][y as usize].update(visible);
             }
         }
@@ -118,13 +118,13 @@ impl TileMap {
     pub fn draw(&self, tcod: &mut Tcod, viewport: &Viewport) {
         let default = Tile::bedrock();
         for pixel in viewport.into_iter() {
-            let tile = self.get(pixel.x, pixel.y).unwrap_or(&default);
+            let tile = self.get(pixel).unwrap_or(&default);
             if let Some(character) = tile.character() {
-                let Pos { x, y } = viewport.transform(pixel);
-                let visible = tcod.is_in_fov(pixel.x as i32, pixel.y as i32);
-                let fg_color = self.map[pixel.x as usize][pixel.y as usize].fg_color(visible);
-                let bg_color = self.map[pixel.x as usize][pixel.y as usize].bg_color(visible);
-                tcod.render(x as i32, y as i32, bg_color, fg_color, character);
+                let p = viewport.transform(pixel);
+                let visible = tcod.is_in_fov(pixel);
+                let fg_color = self.map[pixel.0 as usize][pixel.1 as usize].fg_color(visible);
+                let bg_color = self.map[pixel.0 as usize][pixel.1 as usize].bg_color(visible);
+                tcod.render(p, bg_color, fg_color, character);
             }
         }
     }
@@ -138,19 +138,19 @@ impl TileMap {
             } else {
                 Tile::floor(id)
             };
-            self.map[pos.x as usize][pos.y as usize] = tile;
+            self.map[pos.0 as usize][pos.1 as usize] = tile;
         }
     }
 
     fn create_anti_room<T>(self: &mut TileMap, room: &T) where T: Shape {
         for pos in room.into_iter() {
-            if let Some(id) = self.map[pos.x as usize][pos.y as usize].room {
+            if let Some(id) = self.map[pos.0 as usize][pos.1 as usize].room {
                 let tile = if room.is_boundary(pos) {
                     Tile::wall(id)
                 } else {
                     Tile::bedrock()
                 };
-                self.map[pos.x as usize][pos.y as usize] = tile;
+                self.map[pos.0 as usize][pos.1 as usize] = tile;
             }
         }
     }
@@ -162,8 +162,8 @@ impl TileMap {
             let is_wall = corridor.is_boundary(pos);
 
             let tile;
-            if let Some(old_id) = self.map[pos.x as usize][pos.y as usize].room {
-                let was_wall = self.map[pos.x as usize][pos.y as usize].wall;
+            if let Some(old_id) = self.map[pos.0 as usize][pos.1 as usize].room {
+                let was_wall = self.map[pos.0 as usize][pos.1 as usize].wall;
                 tile = if was_wall && is_wall {
                     Tile::wall(old_id)
                 } else {
@@ -176,42 +176,42 @@ impl TileMap {
                     Tile::floor(id)
                 };
             }
-            self.map[pos.x as usize][pos.y as usize] = tile;
+            self.map[pos.0 as usize][pos.1 as usize] = tile;
         }
     }
 
     fn draw_line(self: &mut TileMap, line: &Line) {
         for pos in line.into_iter() {
-            if let Some(id) = self.map[pos.x as usize][pos.y as usize].room {
-                self.map[pos.x as usize][pos.y as usize] = Tile::wall(id);
+            if let Some(id) = self.map[pos.0 as usize][pos.1 as usize].room {
+                self.map[pos.0 as usize][pos.1 as usize] = Tile::wall(id);
             }
         }
     }
 
-    fn get(self: &TileMap, x: i32, y: i32) -> Option<&Tile> {
-        if x < 0 || x >= self.width || y < 0 || y >= self.height {
+    fn get(self: &TileMap, p: (i32, i32)) -> Option<&Tile> {
+        if p.0 < 0 || p.0 >= self.width || p.1 < 0 || p.1 >= self.height {
             None
         } else {
-            Some(&self.map[x as usize][y as usize])
+            Some(&self.map[p.0 as usize][p.1 as usize])
         }
     }
 
-    pub fn is_blocking(self: &TileMap, x: i32, y: i32) -> bool {
-        match self.get(x, y) {
+    pub fn is_blocking(self: &TileMap, p: (i32, i32)) -> bool {
+        match self.get(p) {
             Some(t) => t.blocking,
             None => true,
         }
     }
 
-    pub fn is_sight_blocking(self: &TileMap, x: i32, y: i32) -> bool {
-        match self.get(x, y) {
+    pub fn is_sight_blocking(self: &TileMap, p: (i32, i32)) -> bool {
+        match self.get(p) {
             Some(t) => t.blocking,
             None => true,
         }
     }
 
-    pub fn is_wall(self: &TileMap, x: i32, y: i32) -> bool {
-        match self.get(x, y) {
+    pub fn is_wall(self: &TileMap, p: (i32, i32)) -> bool {
+        match self.get(p) {
             Some(t) => t.wall,
             None => false,
         }

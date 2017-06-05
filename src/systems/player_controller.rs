@@ -56,20 +56,20 @@ impl System<()> for PlayerController {
             if input.is_mouse_pressed() {
                 // create automatic movement
                 let mut pos = input.mouse_pos();
-                pos.y -= MAP_Y;
+                pos.1 -= MAP_Y;
                 let pos_trans = viewport.inv_transform(pos);
                 if viewport.visible(pos_trans) {
                     // set the position to the middle of the cell to avoid twitching.
-                    let pos_target = Position { x: pos_trans.x as f32 + 0.5,
-                                                y: pos_trans.y as f32 + 0.5 };
-                    move_to_positions.insert(id, MoveToPosition { position: pos_target, speed: PLAYER_SPEED });
+                    let path = maps.find_path(&id, (p.x as i32, p.y as i32), pos_trans);
+                    move_to_positions.insert(id, MoveToPosition { path: path,
+                                                                  speed: PLAYER_SPEED });
                 }
             } else {
                 // player direct movement
                 let delta = get_delta(&input);
                 if delta.x != 0.0 || delta.y != 0.0 {
                     let np = *p + mul(delta.norm(), delta_time*PLAYER_SPEED);
-                    move_to_positions.insert(id, MoveToPosition { position: np, speed: PLAYER_SPEED });
+                    move_to_positions.insert(id, MoveToPosition { path: vec![np], speed: PLAYER_SPEED });
                 }
             }
         }
@@ -78,13 +78,13 @@ impl System<()> for PlayerController {
             let p = positions.get(id).unwrap().clone();
             // player interaction
             if input.is_char_pressed('p') {
-                if let Some(item_id) = maps.pop(Map::Item, p.x as i32, p.y as i32) {
+                if let Some(item_id) = maps.pop(Map::Item, (p.x as i32, p.y as i32)) {
                     inventory.push(item_id);
                     positions.remove(item_id);
                 }
             } else if input.is_char_pressed('d') {
                 if let Some(item_id) = inventory.pop() {
-                    maps.push(Map::Item, &item_id, p.x as i32, p.y as i32);
+                    maps.push(Map::Item, &item_id, (p.x as i32, p.y as i32));
                     positions.insert(item_id, p);
                 }
             }

@@ -22,26 +22,26 @@ impl EntityMap {
         self.map = vec![vec![None; MAP_HEIGHT as usize]; MAP_WIDTH as usize];
     }
 
-    pub fn remove(&mut self, _: &Entity, x: i32, y: i32) -> Option<Entity> {
-        self.pop(x, y)
+    pub fn remove(&mut self, _: &Entity, p: (i32, i32)) -> Option<Entity> {
+        self.pop(p)
     }
 
-    pub fn is_empty(&self, x: i32, y: i32) -> bool {
-        self.map[x as usize][y as usize].is_none()
+    pub fn is_empty(&self, p: (i32, i32)) -> bool {
+        self.map[p.0 as usize][p.1 as usize].is_none()
     }
 
-    pub fn push(&mut self, entity: &Entity, x: i32, y: i32) {
-        self.map[x as usize][y as usize] = Some(*entity);
+    pub fn push(&mut self, entity: &Entity, p: (i32, i32)) {
+        self.map[p.0 as usize][p.1 as usize] = Some(*entity);
     }
 
-    pub fn pop(&mut self, x: i32, y: i32) -> Option<Entity> {
-        let e = self.map[x as usize][y as usize];
-        self.map[x as usize][y as usize] = None;
+    pub fn pop(&mut self, p: (i32, i32)) -> Option<Entity> {
+        let e = self.map[p.0 as usize][p.1 as usize];
+        self.map[p.0 as usize][p.1 as usize] = None;
         e
     }
 
-    pub fn get(&self, x: i32, y: i32) -> Option<Entity> {
-        self.map[x as usize][y as usize]
+    pub fn get(&self, p: (i32, i32)) -> Option<Entity> {
+        self.map[p.0 as usize][p.1 as usize]
     }
 }
 
@@ -65,21 +65,21 @@ impl EntityStackMap {
         self.map = vec![vec![vec![]; MAP_HEIGHT as usize]; MAP_WIDTH as usize];
     }
 
-    pub fn remove(&mut self, entity: &Entity, x: i32, y: i32) -> Option<Entity> {
-        self.map[x as usize][y as usize].iter()
+    pub fn remove(&mut self, entity: &Entity, p: (i32, i32)) -> Option<Entity> {
+        self.map[p.0 as usize][p.1 as usize].iter()
             .position(|e| e == entity)
-            .map(|index| self.map[x as usize][y as usize].swap_remove(index))
+            .map(|index| self.map[p.0 as usize][p.1 as usize].swap_remove(index))
     }
 
-    pub fn is_empty(&self, x: i32, y: i32) -> bool {
-        self.map[x as usize][y as usize].is_empty()
+    pub fn is_empty(&self, p: (i32, i32)) -> bool {
+        self.map[p.0 as usize][p.1 as usize].is_empty()
     }
 
-    pub fn push(&mut self, entity: &Entity, x: i32, y: i32) {
-        self.map[x as usize][y as usize].push(*entity);
+    pub fn push(&mut self, entity: &Entity, p: (i32, i32)) {
+        self.map[p.0 as usize][p.1 as usize].push(*entity);
     }
 
-    pub fn pop(&mut self, x: i32, y: i32) -> Option<Entity> {
-        self.map[x as usize][y as usize].pop()
+    pub fn pop(&mut self, p: (i32, i32)) -> Option<Entity> {
+        self.map[p.0 as usize][p.1 as usize].pop()
     }
 }

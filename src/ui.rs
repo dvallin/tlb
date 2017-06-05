@@ -23,12 +23,12 @@ impl UiElement {
     fn render(&self, tcod: &mut Tcod) {
         match self.data {
             UiData::Text { ref text } => {
-                tcod.render_text(self.rect.left(), self.rect.top(),
+                tcod.render_text((self.rect.left(), self.rect.top()),
                                  colors::BLACK, colors::LIGHT_GREY, text);
             }
             UiData::MultiLine { ref text } => {
                 for i in 0..text.len() {
-                    tcod.render_text(self.rect.left(), self.rect.top() + i as i32,
+                    tcod.render_text((self.rect.left(), self.rect.top() + i as i32),
                                      colors::BLACK, colors::LIGHT_GREY,
                                      text.get(i).unwrap());
                 }

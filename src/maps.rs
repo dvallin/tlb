@@ -1,8 +1,12 @@
 use engine::tcod::{ Tcod };
+use tcod::pathfinding::{ AStar };
 use tile_map::{ TileMap };
-use components::space::{ Viewport };
+use components::space::{ Viewport, Position };
 use entity_map::{ EntityMap, EntityStackMap };
 use specs::{ Entity };
+
+const MAP_WIDTH: i32 = 80;
+const MAP_HEIGHT: i32 = 43;
 
 pub enum Map {
     Item,
@@ -24,17 +28,29 @@ impl Maps {
         }
     }
 
-    pub fn is_blocking(&self, x: i32, y: i32) -> bool {
-        self.tiles.is_blocking(x, y)
+    pub fn find_path(&self, entity: &Entity,
+                     from: (i32, i32), to: (i32, i32)) -> Vec<Position> {
+        let callback = |start: (i32,i32), end:(i32,i32) | if
+            self.is_impassable(entity, end) { 0.0 } else { 1.0 };
+        let mut astar = AStar::new_from_callback(MAP_WIDTH, MAP_HEIGHT, callback, 0.0);
+        // note: implicit reverse
+        astar.find(to, from);
+        astar.iter()
+            .map(|p| Position { x: p.0 as f32 + 0.5, y: p.1 as f32 + 0.5 })
+            .collect::<Vec<Position>>()
     }
 
-    pub fn is_impassable(&self, entity: &Entity, x: i32, y: i32) -> bool {
-        self.tiles.is_blocking(x, y) || self.characters.get(x, y)
+    pub fn is_blocking(&self, p: (i32, i32)) -> bool {
+        self.tiles.is_blocking(p)
+    }
+
+    pub fn is_impassable(&self, entity: &Entity, p: (i32, i32)) -> bool {
+        self.tiles.is_blocking(p) || self.characters.get(p)
             .map(|e| e != *entity).unwrap_or(false)
     }
 
-    pub fn is_sight_blocking(&self, x: i32, y: i32) -> bool {
-        self.tiles.is_sight_blocking(x, y)
+    pub fn is_sight_blocking(&self, p: (i32, i32)) -> bool {
+        self.tiles.is_sight_blocking(p)
     }
 
     pub fn build(&mut self) {
@@ -54,32 +70,32 @@ impl Maps {
         self.characters.clear();
     }
 
-    pub fn move_entity(&mut self, map: Map, entity: &Entity, x1: i32, y1: i32, x2: i32, y2: i32) {
-        if x1 != x2 || y1 != y2 {
+    pub fn move_entity(&mut self, map: Map, entity: &Entity, from: (i32, i32), to: (i32, i32)) {
+        if from.0 != to.0 || from.1 != to.1 {
             match map {
                 Map::Item => {
-                    self.items.remove(entity, x1, y1);
-                    self.items.push(entity, x2, y2);
+                    self.items.remove(entity, from);
+                    self.items.push(entity, to);
                 },
                 Map::Character => {
-                    self.characters.remove(entity, x1, y1);
-                    self.characters.push(entity, x2, y2);
+                    self.characters.remove(entity, from);
+                    self.characters.push(entity, to);
                 },
             }
         }
     }
 
-    pub fn push(&mut self, map: Map, entity: &Entity, x: i32, y: i32) {
+    pub fn push(&mut self, map: Map, entity: &Entity, p: (i32, i32)) {
         match map {
-            Map::Item => self.items.push(entity, x, y),
-            Map::Character => self.characters.push(entity, x, y),
+            Map::Item => self.items.push(entity, p),
+            Map::Character => self.characters.push(entity, p),
         }
     }
 
-    pub fn pop(&mut self, map: Map, x: i32, y: i32) -> Option<Entity> {
+    pub fn pop(&mut self, map: Map, p: (i32, i32)) -> Option<Entity> {
         match map {
-            Map::Item => self.items.pop(x, y),
-            Map::Character => self.items.pop(x, y),
+            Map::Item => self.items.pop(p),
+            Map::Character => self.items.pop(p),
         }
     }
 }

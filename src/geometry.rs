@@ -1,18 +1,12 @@
 use std::cmp::{ min, max };
 
-#[derive(Copy, Clone)]
-pub struct Pos {
-    pub x: i32,
-    pub y: i32,
-}
-
-pub trait Shape: Copy + IntoIterator<Item=Pos> {
-    fn center(&self) -> Pos;
+pub trait Shape: Copy + IntoIterator<Item=(i32, i32)> {
+    fn center(&self) -> (i32, i32);
     fn bounding_box(&self) -> Rect;
 
-    fn is_enclosed(&self, pos: Pos) -> bool;
-    fn is_boundary(&self, pos: Pos) -> bool;
-    fn is_interior(&self, pos: Pos) -> bool;
+    fn is_enclosed(&self, pos: (i32, i32)) -> bool;
+    fn is_boundary(&self, pos: (i32, i32)) -> bool;
+    fn is_interior(&self, pos: (i32, i32)) -> bool;
 }
 
 #[derive(Copy, Clone, Debug, PartialEq)]
@@ -83,31 +77,31 @@ impl Rect {
 }
 
 impl Shape for Rect {
-    fn center(&self) -> Pos {
+    fn center(&self) -> (i32, i32) {
         let center_x = (self.x1 + self.x2) / 2;
         let center_y = (self.y1 + self.y2) / 2;
-        Pos { x: center_x, y: center_y }
+        (center_x, center_y)
     }
 
     fn bounding_box(&self) -> Rect {
         *self
     }
 
-    fn is_enclosed(&self, pos: Pos) -> bool {
-        pos.x >= self.x1 && pos.x < self.x2 && pos.y >= self.y1 && pos.y < self.y2
+    fn is_enclosed(&self, pos: (i32, i32)) -> bool {
+        pos.0 >= self.x1 && pos.0 < self.x2 && pos.1 >= self.y1 && pos.1 < self.y2
     }
 
-    fn is_boundary(&self, pos: Pos) -> bool {
-        pos.x == self.x1 || pos.x == self.x2 - 1 || pos.y == self.y1 || pos.y == self.y2 - 1
+    fn is_boundary(&self, pos: (i32, i32)) -> bool {
+        pos.0 == self.x1 || pos.0 == self.x2 - 1 || pos.1 == self.y1 || pos.1 == self.y2 - 1
     }
 
-    fn is_interior(&self, pos: Pos) -> bool {
-        pos.x > self.x1 && pos.x < self.x2 - 1 && pos.y > self.y1 && pos.y < self.y2 - 1
+    fn is_interior(&self, pos: (i32, i32)) -> bool {
+        pos.0 > self.x1 && pos.0 < self.x2 - 1 && pos.1 > self.y1 && pos.1 < self.y2 - 1
     }
 }
 
 impl IntoIterator for Line {
-    type Item = Pos;
+    type Item = (i32, i32);
     type IntoIter = LineIter;
     fn into_iter(self) -> LineIter {
         LineIter::init(self)
@@ -115,74 +109,67 @@ impl IntoIterator for Line {
 }
 
 impl IntoIterator for Rect {
-    type Item = Pos;
+    type Item = (i32, i32);
     type IntoIter = RectIter;
     fn into_iter(self) -> RectIter {
-        RectIter { rect: self, pos: Pos { x: self.x1 - 1, y: self.y1 } }
+        RectIter { rect: self, pos: (self.x1 - 1, self.y1) }
     }
 }
 
 pub struct LineIter {
-    p0: Pos,
-    p1: Pos,
-    dx: f32,
-    dy: f32,
+    start: (i32, i32),
+    end: (i32, i32),
+    delta: (f32, f32),
+    error: (f32, f32),
     done: bool,
-    ex: f32,
-    ey: f32,
 }
 
 impl LineIter {
     pub fn init(line: Line) -> Self {
-        let p0 = Pos { x: min(line.x1, line.x2), y: min(line.y1, line.y2) };
-        let p1 = Pos { x: max(line.x1, line.x2), y: max(line.y1, line.y2) };
-        let dx = p1.x - p0.x;
-        let dy = p1.y - p0.y;
-        let dxe;
-        let dye;
-        if dy == 0 {
-            dye = 0.0;
-            dxe = 1.0;
-        } else if dx == 0 {
-            dye = 1.0;
-            dxe = 0.0;
+        let start = (min(line.x1, line.x2), min(line.y1, line.y2));
+        let end = (max(line.x1, line.x2), max(line.y1, line.y2));
+        let delta = (end.0 as f32 - start.0 as f32,
+                     end.1 as f32 - start.1 as f32);
+        let error;
+        if delta.1 == 0.0 {
+            error = (1.0, 0.0);
+        } else if delta.0 == 0.0 {
+            error = (0.0, 1.0);
         } else {
-            dxe = (dx as f32 / dy as f32).abs();
-            dye = (dy as f32 / dx as f32).abs();
+            error = ((delta.0 as f32 / delta.1 as f32).abs(),
+                    (delta.1 as f32 / delta.0 as f32).abs());
         }
         LineIter {
-            p0: p0,
-            p1: p1,
-            dx: dxe,
-            dy: dye,
+            start: start,
+            end: end,
+            delta: error, // yes, that is correct ;)
+            error: (error.0 - 0.5, error.1 - 0.5),
             done: false,
-            ex: dxe - 0.5,
-            ey: dye - 0.5,
         }
     }
 
 }
 
 impl Iterator for LineIter {
-    type Item = Pos;
-    fn next(&mut self) -> Option<Pos> {
+    type Item = (i32, i32);
+    fn next(&mut self) -> Option<(i32, i32)> {
         if self.done {
             return None;
         }
 
-        let result = Some(self.p0);
-        if self.p0.x >= self.p1.x && self.p0.y >= self.p1.y {
+        let result = Some(self.start);
+        if self.start.0 >= self.end.0 && self.start.1 >= self.end.1 {
             self.done = true;
         } else {
-            self.ex += self.dx;
-            if self.ex >= 0.5 {
-                self.p0.x += 1;
-                self.ex -= 1.0;
+            self.error.0 += self.delta.0;
+            if self.error.0 >= 0.5 {
+                self.start.0 += 1;
+                self.error.0 -= 1.0;
             }
-            self.ey += self.dy;
-            if self.ey >= 0.5 {
-                self.p0.y += 1;
-                self.ey -= 1.0;
+            self.error.1 += self.delta.1;
+            if self.error.1 >= 0.5 {
+                self.start.1 += 1;
+                self.error.1 -= 1.0;
             }
         }
         return result;
@@ -191,18 +178,18 @@ impl Iterator for LineIter {
 
 pub struct RectIter {
     rect: Rect,
-    pos: Pos,
+    pos: (i32, i32),
 }
 
 impl Iterator for RectIter {
-    type Item = Pos;
-    fn next(&mut self) -> Option<Pos> {
-        self.pos.x += 1;
-        if self.pos.x >= self.rect.x2 {
-            self.pos.x = self.rect.x1;
-            self.pos.y += 1;
+    type Item = (i32, i32);
+    fn next(&mut self) -> Option<(i32, i32)> {
+        self.pos.0 += 1;
+        if self.pos.0 >= self.rect.x2 {
+            self.pos.0 = self.rect.x1;
+            self.pos.1 += 1;
         }
-        if self.pos.y >= self.rect.y2 {
+        if self.pos.1 >= self.rect.y2 {
             None
         } else {
             Some(self.pos)
@@ -211,7 +198,7 @@ impl Iterator for RectIter {
 }
 #[cfg(test)]
 mod tests {
-    use geometry::{ Line, Pos };
+    use geometry::{ Line };
     use std::fmt::{ Display };
 
     fn assert_equals<T>(a: T, b: T)
@@ -219,16 +206,16 @@ mod tests {
         assert!(a == b, "{} is not {}", a, b);
     }
 
-    fn assert_equals_pos(a: &Pos, b: &Pos) {
-        assert_equals(a.x, b.x);
-        assert_equals(a.y, b.y);
+    fn assert_equals_pos(a: (i32, i32), b: (i32, i32)) {
+        assert_equals(a.0, b.0);
+        assert_equals(a.1, b.1);
     }
 
     #[test]
     fn single_pixel_lines() {
         assert!(Line::new(0,0,0,0).into_iter().count() == 1);
         let p = Line::new(0,0,0,0).into_iter().next().unwrap();
-        assert!(p.x == 0 && p.y == 0);
+        assert!(p.0 == 0 && p.1 == 0);
     }
 
     #[test]
@@ -255,33 +242,33 @@ mod tests {
     fn flat_lines() {
         assert_equals(Line::new(0,0,10,7).into_iter().count(), 11);
         let mut iter = Line::new(0,0,10,7).into_iter();
-        assert_equals_pos(&iter.next().unwrap(), &Pos{ x: 0, y: 0});
-        assert_equals_pos(&iter.next().unwrap(), &Pos{ x: 1, y: 1});
-        assert_equals_pos(&iter.next().unwrap(), &Pos{ x: 2, y: 2});
-        assert_equals_pos(&iter.next().unwrap(), &Pos{ x: 3, y: 2});
-        assert_equals_pos(&iter.next().unwrap(), &Pos{ x: 4, y: 3});
-        assert_equals_pos(&iter.next().unwrap(), &Pos{ x: 5, y: 4});
-        assert_equals_pos(&iter.next().unwrap(), &Pos{ x: 6, y: 4});
-        assert_equals_pos(&iter.next().unwrap(), &Pos{ x: 7, y: 5});
-        assert_equals_pos(&iter.next().unwrap(), &Pos{ x: 8, y: 6});
-        assert_equals_pos(&iter.next().unwrap(), &Pos{ x: 9, y: 6});
-        assert_equals_pos(&iter.next().unwrap(), &Pos{ x: 10, y: 7});
+        assert_equals_pos(iter.next().unwrap(), (0, 0));
+        assert_equals_pos(iter.next().unwrap(), (1, 1));
+        assert_equals_pos(iter.next().unwrap(), (2, 2));
+        assert_equals_pos(iter.next().unwrap(), (3, 2));
+        assert_equals_pos(iter.next().unwrap(), (4, 3));
+        assert_equals_pos(iter.next().unwrap(), (5, 4));
+        assert_equals_pos(iter.next().unwrap(), (6, 4));
+        assert_equals_pos(iter.next().unwrap(), (7, 5));
+        assert_equals_pos(iter.next().unwrap(), (8, 6));
+        assert_equals_pos(iter.next().unwrap(), (9, 6));
+        assert_equals_pos(iter.next().unwrap(), (10, 7));
     }
 
     #[test]
     fn steep_lines() {
         assert_equals(Line::new(0,0,7,10).into_iter().count(), 11);
         let mut iter = Line::new(0,0,7,10).into_iter();
-        assert_equals_pos(&iter.next().unwrap(), &Pos{ x: 0, y: 0});
-        assert_equals_pos(&iter.next().unwrap(), &Pos{ x: 1, y: 1});
-        assert_equals_pos(&iter.next().unwrap(), &Pos{ x: 2, y: 2});
-        assert_equals_pos(&iter.next().unwrap(), &Pos{ x: 2, y: 3});
-        assert_equals_pos(&iter.next().unwrap(), &Pos{ x: 3, y: 4});
-        assert_equals_pos(&iter.next().unwrap(), &Pos{ x: 4, y: 5});
-        assert_equals_pos(&iter.next().unwrap(), &Pos{ x: 4, y: 6});
-        assert_equals_pos(&iter.next().unwrap(), &Pos{ x: 5, y: 7});
-        assert_equals_pos(&iter.next().unwrap(), &Pos{ x: 6, y: 8});
-        assert_equals_pos(&iter.next().unwrap(), &Pos{ x: 6, y: 9});
-        assert_equals_pos(&iter.next().unwrap(), &Pos{ x: 7, y: 10});
+        assert_equals_pos(iter.next().unwrap(), (0, 0));
+        assert_equals_pos(iter.next().unwrap(), (1, 1));
+        assert_equals_pos(iter.next().unwrap(), (2, 2));
+        assert_equals_pos(iter.next().unwrap(), (2, 3));
+        assert_equals_pos(iter.next().unwrap(), (3, 4));
+        assert_equals_pos(iter.next().unwrap(), (4, 5));
+        assert_equals_pos(iter.next().unwrap(), (4, 6));
+        assert_equals_pos(iter.next().unwrap(), (5, 7));
+        assert_equals_pos(iter.next().unwrap(), (6, 8));
+        assert_equals_pos(iter.next().unwrap(), (6, 9));
+        assert_equals_pos(iter.next().unwrap(), (7, 10));
     }
 }

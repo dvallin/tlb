@@ -1,5 +1,4 @@
 use std::collections::HashSet;
-use geometry::{ Pos };
 use tcod::input::{ self, Event, Mouse, Key, KeyCode };
 
 #[derive(Default)]
@@ -29,8 +28,8 @@ impl InputHandler {
         self.mouse.lbutton_pressed
     }
 
-    pub fn mouse_pos(&self) -> Pos {
-        Pos { x: self.mouse.cx as i32, y: self.mouse.cy as i32 }
+    pub fn mouse_pos(&self) -> (i32, i32) {
+        (self.mouse.cx as i32, self.mouse.cy as i32)
     }
 
     pub fn is_char_down(&self, key: char) -> bool {

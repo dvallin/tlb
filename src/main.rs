@@ -36,7 +36,7 @@ use components::item::{ Item, ItemInstance };
 use components::common::{ Active, TookTurn, WaitForTurn, MoveToPosition, Health, Description };
 use components::inventory::{ Inventory };
 
-use geometry::{ Pos, Rect };
+use geometry::{ Rect };
 
 use systems::player_controller::{ PlayerController };
 use systems::move_to_controller::{ MoveToController };
@@ -111,13 +111,13 @@ impl Game {
         }
 
         for (id, _, pos) in (&entities, &players, &mut positions).iter() {
-            maps.push(Map::Character, &id, pos.x as i32, pos.y as i32);
+            maps.push(Map::Character, &id, (pos.x as i32, pos.y as i32));
         }
         for (id, _, pos) in (&entities, &npcs, &mut positions).iter() {
-            maps.push(Map::Character, &id, pos.x as i32, pos.y as i32);
+            maps.push(Map::Character, &id, (pos.x as i32, pos.y as i32));
         }
         for (id, _, pos) in (&entities, &items, &mut positions).iter() {
-            maps.push(Map::Item, &id, pos.x as i32, pos.y as i32);
+            maps.push(Map::Item, &id, (pos.x as i32, pos.y as i32));
         }
 
         stats.reset();
@@ -125,10 +125,10 @@ impl Game {
 }
 
 fn render_into_viewport(viewport: &Viewport, position: &Position, renderable: &Renderable, tcod: &mut Tcod) {
-    let p = Pos { x: position.x as i32, y: position.y as i32 };
-    if viewport.visible(p) && tcod.is_in_fov(p.x, p.y) {
+    let p = (position.x as i32, position.y as i32);
+    if viewport.visible(p) && tcod.is_in_fov(p) {
         let pos = viewport.transform(p);
-        tcod.render_character(pos.x, pos.y, renderable.color, renderable.character);
+        tcod.render_character(pos, renderable.color, renderable.character);
     }
 }
 
@@ -189,7 +189,7 @@ impl State for Game {
         let fovs = world.read::<Fov>();
         let positions = world.read::<Position>();
         for (fov, position) in (&fovs, &positions).iter() {
-            tcod.compute_fov(fov.index, position.x as i32, position.y as i32, TORCH_RADIUS);
+            tcod.compute_fov(fov.index, (position.x as i32, position.y as i32), TORCH_RADIUS);
         }
 
         let mut tilemap = world.write_resource::<Maps>();

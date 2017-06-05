@@ -1,6 +1,6 @@
 use std::ops::{ AddAssign, Add, Sub };
 use specs::{ Component, VecStorage };
-use geometry::{ Rect, Pos, Shape, RectIter };
+use geometry::{ Rect, Shape, RectIter };
 
 #[derive(Copy, Clone)]
 pub struct Position {
@@ -99,19 +99,19 @@ impl Viewport {
         self.r.center_at(p.x as i32, p.y as i32);
     }
 
-    pub fn transform(self: &Self, p: Pos) -> Pos {
-        Pos { x: p.x - self.r.left(), y: p.y - self.r.top() }
+    pub fn transform(self: &Self, p: (i32, i32)) -> (i32, i32) {
+        (p.0 - self.r.left(), p.1 - self.r.top())
     }
 
-    pub fn inv_transform(self: &Self, p: Pos) -> Pos {
-        Pos { x: p.x + self.r.left(), y: p.y + self.r.top() }
+    pub fn inv_transform(self: &Self, p: (i32, i32)) -> (i32, i32) {
+        (p.0 + self.r.left(), p.1 + self.r.top())
     }
 
     pub fn into_iter(self: &Self) -> RectIter {
         self.r.into_iter()
     }
 
-    pub fn visible(self: &Self, p: Pos) -> bool {
+    pub fn visible(self: &Self, p: (i32, i32)) -> bool {
         self.r.is_enclosed(p)
     }
 }

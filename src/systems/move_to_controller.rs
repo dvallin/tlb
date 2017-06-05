@@ -26,24 +26,37 @@ impl System<()> for MoveToController {
 
         let mut finished_entities = vec![];
         for (id, p, t) in (&entities, &mut positions, &mut move_to_positions).iter() {
-            if !p.approx_equal(&t.position) {
-                let delta = t.position - *p;
-                let mut np = *p + mul(delta.norm(), delta_time*t.speed);
+            // map last to is_reached? using the walking function
+            if t.path.last().map_or(false, |next_pos|
+                if !p.approx_equal(&next_pos) {
+                    let delta = *next_pos - *p;
+                    let mut np = *p + mul(delta.norm(), delta_time*t.speed);
 
-                // do not overshoot!
-                let delta_new = t.position - np;
-                if delta.dot(&delta_new) < 0.0 {
-                    np = t.position;
-                }
+                    // do not overshoot!
+                    let delta_new = *next_pos - np;
+                    if delta.dot(&delta_new) < 0.0 {
+                        np = *next_pos;
+                    }
 
-                if !maps.is_impassable(&id, np.x as i32, np.y as i32) {
-                    maps.move_entity(Map::Character, &id,
-                                     p.x as i32, p.y as i32, np.x as i32, np.y as i32);
-                    *p = np;
+                    // actually walk to target
+                    if !maps.is_impassable(&id, (np.x as i32, np.y as i32)) {
+                        maps.move_entity(Map::Character, &id,
+                                        (p.x as i32, p.y as i32),
+                                        (np.x as i32, np.y as i32));
+                        *p = np;
+                        false
+                    } else {
+                        // target is unreachable
+                        true
+                    }
                 } else {
-                    finished_entities.push(id);
+                    // target is reached
+                    true
                 }
-            } else {
+            ) {
+                t.path.pop();
+            }
+            if t.path.len() == 0 {
                 finished_entities.push(id);
             }
         }

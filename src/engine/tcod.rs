@@ -59,8 +59,8 @@ impl Tcod {
         let maps = world.read_resource::<Maps>();
         for y in 0..MAP_HEIGHT {
             for x in 0..MAP_WIDTH {
-                let see_through = !maps.is_sight_blocking(x, y);
-                let walk_through = !maps.is_blocking(x, y);
+                let see_through = !maps.is_sight_blocking((x, y));
+                let walk_through = !maps.is_blocking((x, y));
                 self.fov[index].set(x, y, see_through, walk_through);
             }
         }
@@ -88,26 +88,26 @@ impl Tcod {
         self.root.flush();
     }
 
-    pub fn is_in_fov(&self, x: i32, y: i32) -> bool {
+    pub fn is_in_fov(&self, p: (i32, i32)) -> bool {
         self.fov.iter()
-            .any(|f| f.is_in_fov(x,y))
+            .any(|f| f.is_in_fov(p.0, p.1))
     }
 
-    pub fn render(&mut self, x: i32, y: i32, bgcolor: Color, fgcolor: Color, character: char) {
+    pub fn render(&mut self, p: (i32, i32), bgcolor: Color, fgcolor: Color, character: char) {
         self.console.set_default_foreground(fgcolor);
-        self.console.set_char_background(x, y, bgcolor, BackgroundFlag::Set);
-        self.console.put_char(x, y, character, BackgroundFlag::None);
+        self.console.set_char_background(p.0, p.1, bgcolor, BackgroundFlag::Set);
+        self.console.put_char(p.0, p.1, character, BackgroundFlag::None);
     }
 
-    pub fn render_character(&mut self, x: i32, y: i32, fgcolor: Color, character: char) {
+    pub fn render_character(&mut self, p: (i32, i32), fgcolor: Color, character: char) {
         self.console.set_default_foreground(fgcolor);
-        self.console.put_char(x, y, character, BackgroundFlag::None);
+        self.console.put_char(p.0, p.1, character, BackgroundFlag::None);
     }
 
-    pub fn render_text(&mut self, x: i32, y: i32, bgcolor: Color, fgcolor: Color, text: &String) {
+    pub fn render_text(&mut self, p: (i32, i32), bgcolor: Color, fgcolor: Color, text: &String) {
         self.panel.set_default_foreground(fgcolor);
         self.panel.set_default_background(bgcolor);
-        self.panel.print_ex(x, y, BackgroundFlag::Set, TextAlignment::Left, text);
+        self.panel.print_ex(p.0, p.1, BackgroundFlag::Set, TextAlignment::Left, text);
     }
 
     pub fn render_box(&mut self, rect: &Rect, bgcolor: Color, fgcolor: Color) {
@@ -127,7 +127,7 @@ impl Tcod {
         }
     }
 
-    pub fn compute_fov(&mut self, index: usize, x: i32, y: i32, radius: i32) {
-        self.fov[index].compute_fov(x, y, radius, FOV_LIGHT_WALLS, FOV_ALGO);
+    pub fn compute_fov(&mut self, index: usize, p: (i32, i32), radius: i32) {
+        self.fov[index].compute_fov(p.0, p.1, radius, FOV_LIGHT_WALLS, FOV_ALGO);
     }
 }

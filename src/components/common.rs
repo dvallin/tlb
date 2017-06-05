@@ -12,7 +12,7 @@ pub struct Health {
 }
 
 pub struct MoveToPosition {
-    pub position: Position,
+    pub path: Vec<Position>,
     pub speed: f32,
 }
 
