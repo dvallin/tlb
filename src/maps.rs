@@ -45,7 +45,7 @@ impl Maps {
     }
 
     pub fn is_impassable(&self, entity: &Entity, p: (i32, i32)) -> bool {
-        self.tiles.is_blocking(p) || self.characters.get(p)
+        !self.tiles.is_discovered(p) || self.tiles.is_blocking(p) || self.characters.get(p)
             .map(|e| e != *entity).unwrap_or(false)
     }
 

@@ -196,6 +196,13 @@ impl TileMap {
         }
     }
 
+    pub fn is_discovered(self: &TileMap, p: (i32, i32)) -> bool {
+        match self.get(p) {
+            Some(t) => t.discovered,
+            None => true,
+        }
+    }
+
     pub fn is_blocking(self: &TileMap, p: (i32, i32)) -> bool {
         match self.get(p) {
             Some(t) => t.blocking,

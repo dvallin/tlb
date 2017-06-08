@@ -29,14 +29,29 @@ impl Component for Health {
     type Storage = HashMapStorage<Health>;
 }
 
-pub struct WaitForTurn;
 pub struct Active;
+impl Component for Active {
+    type Storage = HashMapStorage<Active>;
+}
+
+pub struct WaitForTurn;
+pub enum InTurnState {
+    Idle,
+    Walking,
+}
+pub struct InTurn(pub InTurnState);
+impl Default for InTurn {
+    fn default() -> Self {
+        InTurn(InTurnState::Idle)
+    }
+}
+
 pub struct TookTurn;
 impl Component for WaitForTurn {
     type Storage = HashMapStorage<WaitForTurn>;
 }
-impl Component for Active {
-    type Storage = HashMapStorage<Active>;
+impl Component for InTurn {
+    type Storage = HashMapStorage<InTurn>;
 }
 impl Component for TookTurn {
     type Storage = HashMapStorage<TookTurn>;
