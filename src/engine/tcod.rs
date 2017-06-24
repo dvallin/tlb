@@ -99,6 +99,10 @@ impl Tcod {
         self.console.put_char(p.0, p.1, character, BackgroundFlag::None);
     }
 
+    pub fn highlight(&mut self, p: (i32, i32), color: Color) {
+        self.console.set_char_background(p.0, p.1, color, BackgroundFlag::Set);
+    }
+
     pub fn render_character(&mut self, p: (i32, i32), fgcolor: Color, character: char) {
         self.console.set_default_foreground(fgcolor);
         self.console.put_char(p.0, p.1, character, BackgroundFlag::None);

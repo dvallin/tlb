@@ -35,6 +35,8 @@ impl Component for Active {
 }
 
 pub struct WaitForTurn;
+
+#[derive(Debug, Copy, Clone)]
 pub enum InTurnState {
     Idle,
     Walking,

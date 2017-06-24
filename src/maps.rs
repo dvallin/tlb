@@ -1,12 +1,17 @@
 use engine::tcod::{ Tcod };
 use tcod::pathfinding::{ AStar };
+use tcod::colors::{ self, Color };
 use tile_map::{ TileMap };
 use components::space::{ Viewport, Position };
 use entity_map::{ EntityMap, EntityStackMap };
 use specs::{ Entity };
 
+const SCREEN_WIDTH: i32 = 80;
+const SCREEN_HEIGHT: i32 = 50;
+
 const MAP_WIDTH: i32 = 80;
 const MAP_HEIGHT: i32 = 43;
+const MAP_Y: i32 = SCREEN_HEIGHT - MAP_HEIGHT;
 
 pub enum Map {
     Item,
@@ -17,6 +22,7 @@ pub struct Maps {
     characters: EntityMap,
     items: EntityStackMap,
     tiles: TileMap,
+    highlights: Vec<(i32, i32)>,
 }
 
 impl Maps {
@@ -25,6 +31,16 @@ impl Maps {
             characters: EntityMap::new(),
             items: EntityStackMap::new(),
             tiles: TileMap::new(),
+            highlights: vec![],
+        }
+    }
+
+    pub fn screen_to_map(&self, pos: (i32, i32)) -> Option<(i32, i32)> {
+        let p = (pos.0, pos.1 - MAP_Y);
+        if p.0 >= 0 && p.0 < MAP_WIDTH && p.1 >= 0 && p.1 < MAP_HEIGHT {
+            Some(p)
+        } else {
+            None
         }
     }
 
@@ -33,11 +49,25 @@ impl Maps {
         let callback = |start: (i32,i32), end:(i32,i32) | if
             self.is_impassable(entity, end) { 0.0 } else { 1.0 };
         let mut astar = AStar::new_from_callback(MAP_WIDTH, MAP_HEIGHT, callback, 0.0);
-        // note: implicit reverse
-        astar.find(to, from);
-        astar.iter()
+        astar.find(from, to);
+        let mut path = astar.walk()
             .map(|p| Position { x: p.0 as f32 + 0.5, y: p.1 as f32 + 0.5 })
-            .collect::<Vec<Position>>()
+            .collect::<Vec<Position>>();
+        path.reverse();
+        path
+    }
+
+    pub fn clear_highlights(&mut self) {
+        self.highlights.clear();
+    }
+
+    pub fn add_highlights(&mut self, highlights: Vec<Position>) {
+        self.highlights.extend(
+            highlights
+                .iter()
+                .cloned()
+                .map(|p| (p.x as i32, p.y as i32))
+        );
     }
 
     pub fn is_blocking(&self, p: (i32, i32)) -> bool {
@@ -63,6 +93,15 @@ impl Maps {
 
     pub fn draw(&self, tcod: &mut Tcod, viewport: &Viewport) {
         self.tiles.draw(tcod, viewport);
+
+        let highlight_color = colors::LIGHT_GREEN;
+        for pos in self.highlights.iter() {
+            let pixel = *pos;
+            if viewport.visible(pixel) {
+                let p = viewport.transform(pixel);
+                tcod.highlight(p, highlight_color);
+            }
+        }
     }
 
     pub fn clear_all(&mut self) {

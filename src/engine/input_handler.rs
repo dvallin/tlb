@@ -4,6 +4,7 @@ use tcod::input::{ self, Event, Mouse, Key, KeyCode };
 #[derive(Default)]
 pub struct InputHandler {
     pub mouse: Mouse,
+    pub mouse_pos: (i32, i32),
     pub key: Key,
     pub pressed_keys: HashSet<char>,
 }
@@ -22,14 +23,11 @@ impl InputHandler {
 
     fn register_mouse(&mut self, mouse: Mouse) {
         self.mouse = mouse;
+        self.mouse_pos = (self.mouse.cx as i32, self.mouse.cy as i32);
     }
 
     pub fn is_mouse_pressed(&self) -> bool {
         self.mouse.lbutton_pressed
-    }
-
-    pub fn mouse_pos(&self) -> (i32, i32) {
-        (self.mouse.cx as i32, self.mouse.cy as i32)
     }
 
     pub fn is_char_down(&self, key: char) -> bool {
