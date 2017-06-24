@@ -23,6 +23,7 @@ pub struct Maps {
     items: EntityStackMap,
     tiles: TileMap,
     highlights: Vec<(i32, i32)>,
+    highlight_color: Color,
 }
 
 impl Maps {
@@ -32,6 +33,7 @@ impl Maps {
             items: EntityStackMap::new(),
             tiles: TileMap::new(),
             highlights: vec![],
+            highlight_color: colors::LIGHT_GREEN,
         }
     }
 
@@ -59,6 +61,10 @@ impl Maps {
 
     pub fn clear_highlights(&mut self) {
         self.highlights.clear();
+    }
+
+    pub fn set_highlight_color(&mut self, color: Color) {
+        self.highlight_color = color;
     }
 
     pub fn add_highlights(&mut self, highlights: Vec<Position>) {
@@ -94,12 +100,11 @@ impl Maps {
     pub fn draw(&self, tcod: &mut Tcod, viewport: &Viewport) {
         self.tiles.draw(tcod, viewport);
 
-        let highlight_color = colors::LIGHT_GREEN;
         for pos in self.highlights.iter() {
             let pixel = *pos;
             if viewport.visible(pixel) {
                 let p = viewport.transform(pixel);
-                tcod.highlight(p, highlight_color);
+                tcod.highlight(p, self.highlight_color);
             }
         }
     }

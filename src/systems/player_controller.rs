@@ -60,11 +60,21 @@ impl System<()> for PlayerController {
                     let pos_trans = viewport.inv_transform(input.mouse_pos);
                     if let Some(pos) = maps.screen_to_map(pos_trans) {
                         if viewport.visible(pos_trans) {
-                            // set the position to the middle of the cell to avoid twitching.
-                            let path = maps.find_path(&id, (p.x as i32, p.y as i32), pos);
-                            move_to_positions.insert(id, MoveToPosition { path: path,
-                                                                        speed: PLAYER_SPEED });
-                            in_turn.0 = InTurnState::Walking;
+                            let dist = (Vector { x: p.x - pos.0 as f32, y: p.y - pos.1 as f32}).length();
+                            let mut cost = None;
+                            if dist < 5.0 {
+                                cost = Some(1);
+                            } else if dist < 10.0 && !in_turn.has_walked {
+                                cost = Some(2)
+                            }
+
+                            if let Some(c) = cost {
+                                // set the position to the middle of the cell to avoid twitching.
+                                let path = maps.find_path(&id, (p.x as i32, p.y as i32), pos);
+                                move_to_positions.insert(id, MoveToPosition { path: path,
+                                                                              speed: PLAYER_SPEED });
+                                in_turn.walk(c);
+                            }
                         }
                     }
                 }

@@ -51,16 +51,17 @@ impl System<()> for RoundScheduler {
                 took_turn = true;
             }
 
-            if let Some ((id, in_turn)) = (&entities, &in_turns).iter().next() {
-                // for now just finishing the walking finishes the turn
-                match in_turn.0 {
+            if let Some ((id, in_turn)) = (&entities, &mut in_turns).iter().next() {
+                match in_turn.state {
                     InTurnState::Walking => {
                         if move_to_positions.get(id).is_none() {
-                            took_turn = true;
+                            in_turn.action_done();
                         }
                     },
                     _ => {}
                 }
+
+                took_turn = in_turn.is_done();
             }
 
             if took_turn {

@@ -1,9 +1,10 @@
 use specs::{ System, RunArg, Join };
 
 use ui::{ Ui, UiData };
+use tcod::colors::{ self, Color };
 use game_stats::{ GameStats };
 use components::player::{ Player };
-use components::space::{ Position, Viewport };
+use components::space::{ Position, Vector, Viewport };
 use components::inventory::{ Inventory };
 use engine::input_handler::{ InputHandler };
 use components::common::{ Active, InTurn, InTurnState, Description, Health };
@@ -61,13 +62,30 @@ impl System<()> for UiUpdater {
             }
 
             if let Some(turn) = in_turn {
-                match turn.0 {
+                match turn.state {
                     InTurnState::Idle => {
                         let pos_trans = viewport.inv_transform(input.mouse_pos);
                         if let Some(pos) = maps.screen_to_map(pos_trans) {
+                            let dist = (Vector { x: p.x - pos.0 as f32, y: p.y - pos.1 as f32}).length();
+                            let mut color = None;
+                            if turn.has_walked {
+                                if dist < 5.0 {
+                                    color = Some(colors::LIGHT_ORANGE);
+                                }
+                            } else {
+                                if dist < 5.0 {
+                                    color = Some(colors::LIGHT_GREEN);
+                                } else if dist < 10.0 {
+                                    color = Some(colors::LIGHT_ORANGE);
+                                }
+                            }
+
                             if viewport.visible(pos) {
-                                let path = maps.find_path(&id, (p.x as i32, p.y as i32), pos);
-                                maps.add_highlights(path);
+                                if let Some(c) = color {
+                                    let path = maps.find_path(&id, (p.x as i32, p.y as i32), pos);
+                                    maps.set_highlight_color(c);
+                                    maps.add_highlights(path);
+                                }
                             }
                         }
                     },
