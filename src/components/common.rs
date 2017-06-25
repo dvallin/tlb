@@ -34,8 +34,6 @@ impl Component for Active {
     type Storage = HashMapStorage<Active>;
 }
 
-pub struct WaitForTurn;
-
 #[derive(PartialEq, Debug, Copy, Clone)]
 pub enum InTurnState {
     Idle,
@@ -70,15 +68,13 @@ impl InTurn {
     }
 }
 
-pub struct TookTurn;
-impl Component for WaitForTurn {
-    type Storage = HashMapStorage<WaitForTurn>;
-}
 impl Component for InTurn {
     type Storage = HashMapStorage<InTurn>;
 }
-impl Component for TookTurn {
-    type Storage = HashMapStorage<TookTurn>;
+
+pub struct WaitForTurn;
+impl Component for WaitForTurn {
+    type Storage = HashMapStorage<WaitForTurn>;
 }
 
 impl Description {

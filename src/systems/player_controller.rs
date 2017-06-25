@@ -54,7 +54,7 @@ impl System<()> for PlayerController {
         let delta_time = time.delta_time.subsec_nanos() as f32 / 1.0e9;
 
         if state.is_turn_based {
-            if let Some ((id, p, _, in_turn)) = (&entities, &positions, &players, &mut in_turns).iter().next() {
+            if let Some ((id, p, _, _, in_turn)) = (&entities, &positions, &actives, &players, &mut in_turns).iter().next() {
                 if input.is_mouse_pressed() {
                     // create automatic movement
                     let pos_trans = viewport.inv_transform(input.mouse_pos);

@@ -33,7 +33,7 @@ use components::space::{ Position, Spawn, Viewport };
 use components::player::{ Player, Fov };
 use components::npc::{ Npc, NpcInstance };
 use components::item::{ Item, ItemInstance };
-use components::common::{ Active, InTurn, TookTurn, WaitForTurn,
+use components::common::{ Active, InTurn, WaitForTurn,
                           MoveToPosition, Health, Description };
 use components::inventory::{ Inventory };
 
@@ -235,9 +235,8 @@ fn main() {
         .register::<Fov>()
         .register::<Description>()
         .register::<Active>()
-        .register::<WaitForTurn>()
         .register::<InTurn>()
-        .register::<TookTurn>()
+        .register::<WaitForTurn>()
         .register::<Inventory>()
         .register::<Health>()
         .register::<MoveToPosition>()

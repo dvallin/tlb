@@ -41,7 +41,7 @@ impl System<()> for UiUpdater {
             let active = actives.get(id);
             let in_turn = in_turns.get(id);
 
-            if active.is_some() || active.is_some() {
+            if active.is_some() {
                 ui.update("active_player".into(), UiData::MultiLine { text: vec![
                     description.name.clone(),
                     health.health.to_string()
@@ -52,45 +52,45 @@ impl System<()> for UiUpdater {
                         .map(|description| description.name.clone())
                         .collect()
                 });
+
+                if let Some(turn) = in_turn {
+                    match turn.state {
+                        InTurnState::Idle => {
+                            let pos_trans = viewport.inv_transform(input.mouse_pos);
+                            if let Some(pos) = maps.screen_to_map(pos_trans) {
+                                let dist = (Vector { x: p.x - pos.0 as f32, y: p.y - pos.1 as f32}).length();
+                                let mut color = None;
+                                if turn.has_walked {
+                                    if dist < 5.0 {
+                                        color = Some(colors::LIGHT_ORANGE);
+                                    }
+                                } else {
+                                    if dist < 5.0 {
+                                        color = Some(colors::LIGHT_GREEN);
+                                    } else if dist < 10.0 {
+                                        color = Some(colors::LIGHT_ORANGE);
+                                    }
+                                }
+
+                                if viewport.visible(pos) {
+                                    if let Some(c) = color {
+                                        let path = maps.find_path(&id, (p.x as i32, p.y as i32), pos);
+                                        maps.set_highlight_color(c);
+                                        maps.add_highlights(path);
+                                    }
+                                }
+                            }
+                        },
+                        _ => (),
+                    }
+                }
             }
 
-            if active.is_none() && in_turn.is_none() {
+            if active.is_none() {
                 ui.update("inactive_player".into(), UiData::MultiLine { text: vec![
                     description.name.clone(),
                     health.health.to_string()
                 ]});
-            }
-
-            if let Some(turn) = in_turn {
-                match turn.state {
-                    InTurnState::Idle => {
-                        let pos_trans = viewport.inv_transform(input.mouse_pos);
-                        if let Some(pos) = maps.screen_to_map(pos_trans) {
-                            let dist = (Vector { x: p.x - pos.0 as f32, y: p.y - pos.1 as f32}).length();
-                            let mut color = None;
-                            if turn.has_walked {
-                                if dist < 5.0 {
-                                    color = Some(colors::LIGHT_ORANGE);
-                                }
-                            } else {
-                                if dist < 5.0 {
-                                    color = Some(colors::LIGHT_GREEN);
-                                } else if dist < 10.0 {
-                                    color = Some(colors::LIGHT_ORANGE);
-                                }
-                            }
-
-                            if viewport.visible(pos) {
-                                if let Some(c) = color {
-                                    let path = maps.find_path(&id, (p.x as i32, p.y as i32), pos);
-                                    maps.set_highlight_color(c);
-                                    maps.add_highlights(path);
-                                }
-                            }
-                        }
-                    },
-                    _ => (),
-                }
             }
         }
     }
