@@ -12,6 +12,7 @@ mod systems;
 mod maps;
 mod game_stats;
 mod game_state;
+mod event_log;
 
 use specs::{ World, Join };
 
@@ -26,6 +27,7 @@ use tcod::input::{ KeyCode };
 use maps::{ Maps, Map };
 use game_stats::{ GameStats };
 use game_state::{ GameState };
+use event_log::{ EventLog };
 use ui::{ Ui };
 
 use components::appearance::{ Renderable, Layer0, Layer1 };
@@ -138,6 +140,7 @@ impl State for Game {
         world.add_resource::<InputHandler>(InputHandler::default());
         world.add_resource::<GameStats>(GameStats::default());
         world.add_resource::<GameState>(GameState::default());
+        world.add_resource::<EventLog>(EventLog::default());
         world.add_resource::<Viewport>(Viewport::new(15, 15, 80, 40));
         let mut maps = Maps::new();
         maps.build();
@@ -157,8 +160,9 @@ impl State for Game {
 
         let mut ui = Ui::new();
         ui.add("active_player".into(), Rect::new(1, 1, 11, 2));
-        ui.add("time_left".into(), Rect::new(24, 1, 11, 1));
-        ui.add("inventory".into(), Rect::new(38, 1, 21, 5));
+        ui.add("time_left".into(), Rect::new(37, 1, 5, 1));
+        ui.add("inventory".into(), Rect::new(44, 1, 21, 5));
+        ui.add("event_log".into(), Rect::new(14, 1, 21, 5));
         ui.add("inactive_player".into(), Rect::new(67, 1, 11, 2));
         world.add_resource::<Ui>(ui);
 

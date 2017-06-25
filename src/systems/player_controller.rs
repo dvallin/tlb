@@ -1,3 +1,4 @@
+use std::collections::VecDeque;
 use specs::{ System, RunArg, Join };
 
 use game_state::{ GameState };
@@ -89,7 +90,7 @@ impl System<()> for PlayerController {
                             // set the position to the middle of the cell to avoid twitching.
                             let path = maps.find_path(&id, (p.x as i32, p.y as i32), pos);
                             move_to_positions.insert(id, MoveToPosition { path: path,
-                                                                        speed: PLAYER_SPEED });
+                                                                          speed: PLAYER_SPEED });
                         }
                     }
                 } else {
@@ -97,7 +98,10 @@ impl System<()> for PlayerController {
                     let delta = get_delta(&input);
                     if delta.x != 0.0 || delta.y != 0.0 {
                         let np = *p + mul(delta.norm(), delta_time*PLAYER_SPEED);
-                        move_to_positions.insert(id, MoveToPosition { path: vec![np], speed: PLAYER_SPEED });
+                        let mut path = VecDeque::new();
+                        path.push_back(np);
+                        move_to_positions.insert(id, MoveToPosition { path: path,
+                                                                      speed: PLAYER_SPEED });
                     }
                 }
             }

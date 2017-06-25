@@ -2,6 +2,7 @@ use specs::{ System, RunArg, Join };
 
 use tcod::input::{ KeyCode };
 use game_state::{ GameState };
+use event_log::{ EventLog, LogEvent };
 
 use components::player::{ Player };
 use components::common::{ Active, InTurn, InTurnState, WaitForTurn, MoveToPosition };
@@ -13,13 +14,14 @@ unsafe impl Sync for RoundScheduler {}
 impl System<()> for RoundScheduler {
     fn run(&mut self, arg: RunArg, _: ()) {
         let (entities, players, mut actives, mut in_turns, mut waits,
-             move_to_positions, mut state, input) = arg.fetch(|w| {
+             move_to_positions, mut log, mut state, input) = arg.fetch(|w| {
                  (w.entities(),
                   w.read::<Player>(),
                   w.write::<Active>(),
                   w.write::<InTurn>(),
                   w.write::<WaitForTurn>(),
                   w.read::<MoveToPosition>(),
+                  w.write_resource::<EventLog>(),
                   w.write_resource::<GameState>(),
                   w.read_resource::<InputHandler>())
         });
@@ -67,6 +69,7 @@ impl System<()> for RoundScheduler {
 
             // switch the took turns to wait for turn
             for id in took_turns {
+                log.log(LogEvent::FinishedTurn(id));
                 waits.insert(id, WaitForTurn);
                 in_turns.remove(id);
             }

@@ -1,3 +1,4 @@
+use std::collections::VecDeque;
 use components::space::{ Position };
 use specs::{ Component, HashMapStorage, VecStorage };
 
@@ -12,7 +13,7 @@ pub struct Health {
 }
 
 pub struct MoveToPosition {
-    pub path: Vec<Position>,
+    pub path: VecDeque<Position>,
     pub speed: f32,
 }
 

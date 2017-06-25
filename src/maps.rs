@@ -1,3 +1,4 @@
+use std::collections::VecDeque;
 use engine::tcod::{ Tcod };
 use tcod::pathfinding::{ AStar };
 use tcod::colors::{ self, Color };
@@ -47,16 +48,14 @@ impl Maps {
     }
 
     pub fn find_path(&self, entity: &Entity,
-                     from: (i32, i32), to: (i32, i32)) -> Vec<Position> {
+                     from: (i32, i32), to: (i32, i32)) -> VecDeque<Position> {
         let callback = |start: (i32,i32), end:(i32,i32) | if
             self.is_impassable(entity, end) { 0.0 } else { 1.0 };
         let mut astar = AStar::new_from_callback(MAP_WIDTH, MAP_HEIGHT, callback, 0.0);
         astar.find(from, to);
-        let mut path = astar.walk()
+        astar.walk()
             .map(|p| Position { x: p.0 as f32 + 0.5, y: p.1 as f32 + 0.5 })
-            .collect::<Vec<Position>>();
-        path.reverse();
-        path
+            .collect::<VecDeque<Position>>()
     }
 
     pub fn clear_highlights(&mut self) {
@@ -67,7 +66,7 @@ impl Maps {
         self.highlight_color = color;
     }
 
-    pub fn add_highlights(&mut self, highlights: Vec<Position>) {
+    pub fn add_highlights(&mut self, highlights: VecDeque<Position>) {
         self.highlights.extend(
             highlights
                 .iter()

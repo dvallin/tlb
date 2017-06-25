@@ -39,7 +39,7 @@ impl System<()> for MoveToController {
         let mut finished_entities = vec![];
         for (id, p, t) in (&entities, &mut positions, &mut move_to_positions).iter() {
             // map last to is_reached? using the walking function
-            if t.path.last().map_or(false, |next_pos|
+            if t.path.front().map_or(false, |next_pos|
                 if !p.approx_equal(&next_pos) {
                     let np = move_to(p, next_pos, t, delta_time);
                     // actually walk to target
@@ -58,7 +58,7 @@ impl System<()> for MoveToController {
                     true
                 }
             ) {
-                t.path.pop();
+                t.path.pop_front();
             }
             if t.path.len() == 0 {
                 finished_entities.push(id);

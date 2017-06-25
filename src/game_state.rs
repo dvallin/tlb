@@ -10,6 +10,6 @@ impl Default for GameState {
 
 impl GameState {
     pub fn reset(&mut self) {
-        self.is_turn_based = GameState::default().is_turn_based;
+        *self = GameState::default();
     }
 }

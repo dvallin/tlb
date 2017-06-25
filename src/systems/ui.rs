@@ -3,6 +3,7 @@ use specs::{ System, RunArg, Join };
 use ui::{ Ui, UiData };
 use tcod::colors::{ self, Color };
 use game_stats::{ GameStats };
+use event_log::{ EventLog, LogEvent };
 use components::player::{ Player };
 use components::space::{ Position, Vector, Viewport };
 use components::inventory::{ Inventory };
@@ -17,7 +18,7 @@ unsafe impl Sync for UiUpdater {}
 impl System<()> for UiUpdater {
     fn run(&mut self, arg: RunArg, _: ()) {
         let (entities, players, positions, actives, in_turns, descriptions, health, inventories,
-             input, stats, viewport, mut maps, mut ui) = arg.fetch(|w| {
+             input, stats, log, viewport, mut maps, mut ui) = arg.fetch(|w| {
              (w.entities(),
               w.read::<Player>(),
               w.read::<Position>(),
@@ -28,6 +29,7 @@ impl System<()> for UiUpdater {
               w.read::<Inventory>(),
               w.read_resource::<InputHandler>(),
               w.read_resource::<GameStats>(),
+              w.read_resource::<EventLog>(),
               w.read_resource::<Viewport>(),
               w.write_resource::<Maps>(),
               w.write_resource::<Ui>())
@@ -42,10 +44,12 @@ impl System<()> for UiUpdater {
             let in_turn = in_turns.get(id);
 
             if active.is_some() {
+                // render player stats
                 ui.update("active_player".into(), UiData::MultiLine { text: vec![
                     description.name.clone(),
                     health.health.to_string()
                 ]});
+                // render player inventory
                 ui.update("inventory".into(), UiData::MultiLine {
                     text: inventory.items.iter()
                         .filter_map(|item| descriptions.get(*item))
@@ -53,6 +57,7 @@ impl System<()> for UiUpdater {
                         .collect()
                 });
 
+                // render movement selection highlights
                 if let Some(turn) = in_turn {
                     match turn.state {
                         InTurnState::Idle => {
@@ -87,11 +92,27 @@ impl System<()> for UiUpdater {
             }
 
             if active.is_none() {
+                // render secondary player stats
                 ui.update("inactive_player".into(), UiData::MultiLine { text: vec![
                     description.name.clone(),
                     health.health.to_string()
                 ]});
             }
         }
+
+        ui.update("event_log".into(), UiData::MultiLine {
+            text: log.logs.iter()
+                .map(|event| {
+                    match *event {
+                        LogEvent::FinishedTurn(id) => {
+                            format!("{} finished turn", descriptions.get(id)
+                                    .map(|d| d.name.clone())
+                                    .unwrap_or("unknwon".into()))
+                        }
+                    }
+                })
+                .take(5)
+                .collect::<Vec<String>>()
+        });
     }
 }
