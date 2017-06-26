@@ -57,32 +57,38 @@ impl System<()> for UiUpdater {
                         .collect()
                 });
 
-                // render movement selection highlights
                 if let Some(turn) = in_turn {
                     match turn.state {
                         InTurnState::Idle => {
                             let pos_trans = viewport.inv_transform(input.mouse_pos);
                             if let Some(pos) = maps.screen_to_map(pos_trans) {
                                 let dist = (Vector { x: p.x - pos.0 as f32, y: p.y - pos.1 as f32}).length();
-                                let mut color = None;
-                                if turn.has_walked {
-                                    if dist < 5.0 {
-                                        color = Some(colors::LIGHT_ORANGE);
+                                if !maps.is_occupied(pos) {
+                                    // render movement selection highlights
+                                    let mut color = None;
+                                    if turn.has_walked {
+                                        if dist < 5.0 {
+                                            color = Some(colors::LIGHT_ORANGE);
+                                        }
+                                    } else {
+                                        if dist < 5.0 {
+                                            color = Some(colors::LIGHT_GREEN);
+                                        } else if dist < 10.0 {
+                                            color = Some(colors::LIGHT_ORANGE);
+                                        }
                                     }
-                                } else {
-                                    if dist < 5.0 {
-                                        color = Some(colors::LIGHT_GREEN);
-                                    } else if dist < 10.0 {
-                                        color = Some(colors::LIGHT_ORANGE);
-                                    }
-                                }
 
-                                if viewport.visible(pos) {
-                                    if let Some(c) = color {
-                                        let path = maps.find_path(&id, (p.x as i32, p.y as i32), pos);
-                                        maps.set_highlight_color(c);
-                                        maps.add_highlights(path);
+                                    if viewport.visible(pos) {
+                                        if let Some(c) = color {
+                                            let path = maps.find_path(&id, (p.x as i32, p.y as i32), pos);
+                                            maps.set_highlight_color(c);
+                                            maps.add_highlights(path);
+                                        }
                                     }
+                                } else if dist > 0.0 {
+                                    let ray = maps.cast_ray(&id, (p.x as i32, p.y as i32), pos);
+                                    maps.set_highlight_color(colors::LIGHT_RED);
+                                    maps.add_highlights(ray);
                                 }
                             }
                         },

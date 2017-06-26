@@ -3,6 +3,7 @@ use engine::tcod::{ Tcod };
 use tcod::pathfinding::{ AStar };
 use tcod::colors::{ self, Color };
 use tile_map::{ TileMap };
+use geometry::{ Ray };
 use components::space::{ Viewport, Position };
 use entity_map::{ EntityMap, EntityStackMap };
 use specs::{ Entity };
@@ -58,6 +59,14 @@ impl Maps {
             .collect::<VecDeque<Position>>()
     }
 
+    pub fn cast_ray(&self, entity: &Entity,
+                    from: (i32, i32), to: (i32, i32)) -> VecDeque<Position> {
+        Ray::new(from, to).into_iter()
+            .take_while(|p| !self.is_impassable(entity, *p))
+            .map(|p| Position { x: p.0 as f32 + 0.5, y: p.1 as f32 + 0.5 })
+            .collect::<VecDeque<Position>>()
+    }
+
     pub fn clear_highlights(&mut self) {
         self.highlights.clear();
     }
@@ -86,6 +95,10 @@ impl Maps {
 
     pub fn is_sight_blocking(&self, p: (i32, i32)) -> bool {
         self.tiles.is_sight_blocking(p)
+    }
+
+    pub fn is_occupied(&self, p: (i32, i32)) -> bool {
+        self.characters.get(p).is_some()
     }
 
     pub fn build(&mut self) {

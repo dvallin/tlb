@@ -12,10 +12,14 @@ pub trait Shape: Copy + IntoIterator<Item=(i32, i32)> {
 
 #[derive(Copy, Clone, Debug, PartialEq)]
 pub struct Line {
-    x1: i32,
-    y1: i32,
-    x2: i32,
-    y2: i32,
+    p1: (i32, i32),
+    p2: (i32, i32),
+}
+
+#[derive(Copy, Clone, Debug, PartialEq)]
+pub struct Ray {
+    p1: (i32, i32),
+    p2: (i32, i32),
 }
 
 #[derive(Copy, Clone, Debug, PartialEq)]
@@ -35,7 +39,15 @@ pub struct Triangle {
 
 impl Line {
     pub fn new(x1: i32, y1: i32, x2: i32, y2: i32) -> Self {
-        Line { x1: x1, y1: y1, x2: x2, y2: y2 }
+        assert!(x1 != y1 || x2 != y2);
+        Line { p1: (x1, y1), p2: (x2, y2) }
+    }
+}
+
+impl Ray {
+    pub fn new(p1: (i32, i32), p2: (i32, i32)) -> Self {
+        assert!(p1.0 != p2.0 || p1.1 != p2.1);
+        Ray { p1: p1, p2: p2 }
     }
 }
 
@@ -170,9 +182,17 @@ impl IntoIterator for Triangle {
 
 impl IntoIterator for Line {
     type Item = (i32, i32);
-    type IntoIter = LineIter;
-    fn into_iter(self) -> LineIter {
-        LineIter::init(self)
+    type IntoIter = BresenhamIter;
+    fn into_iter(self) -> BresenhamIter {
+        BresenhamIter::init(self.p1, self.p2, false)
+    }
+}
+
+impl IntoIterator for Ray {
+    type Item = (i32, i32);
+    type IntoIter = BresenhamIter;
+    fn into_iter(self) -> BresenhamIter {
+        BresenhamIter::init(self.p1, self.p2, true)
     }
 }
 
@@ -207,41 +227,45 @@ impl<T> Iterator for ShapeIter<T> where T: Shape {
     }
 }
 
-pub struct LineIter {
+pub struct BresenhamIter {
+    index: i32,
     start: (i32, i32),
-    end: (i32, i32),
+    sign: (i32, i32),
     delta: (f32, f32),
-    error: (f32, f32),
+    swap: bool,
+    d: f32,
+    overshoot: bool,
     done: bool,
 }
 
-impl LineIter {
-    pub fn init(line: Line) -> Self {
-        let start = (min(line.x1, line.x2), min(line.y1, line.y2));
-        let end = (max(line.x1, line.x2), max(line.y1, line.y2));
-        let delta = (end.0 as f32 - start.0 as f32,
-                     end.1 as f32 - start.1 as f32);
-        let error;
-        if delta.1 == 0.0 {
-            error = (1.0, 0.0);
-        } else if delta.0 == 0.0 {
-            error = (0.0, 1.0);
+impl BresenhamIter {
+    pub fn init(p1: (i32, i32), p2: (i32, i32), overshoot: bool) -> Self {
+        let mut delta = ((p2.0 as f32 - p1.0 as f32).abs(),
+                     (p2.1 as f32 - p1.1 as f32).abs());
+        let sign = ((p2.0 - p1.0).signum(), (p2.1 - p1.1).signum());
+        let swap;
+        if delta.1 > delta.0 {
+            delta = (delta.1, delta.0);
+            swap = true;
         } else {
-            error = ((delta.0 as f32 / delta.1 as f32).abs(),
-                    (delta.1 as f32 / delta.0 as f32).abs());
+            swap = false;
         }
-        LineIter {
-            start: start,
-            end: end,
-            delta: error, // yes, that is correct ;)
-            error: (error.0 - 0.5, error.1 - 0.5),
+        let d = 2.0 * delta.1 - delta.0;
+        BresenhamIter {
+            index: 0,
+            start: p1,
+            sign: sign,
+            delta: delta,
+            d: d,
+            swap: swap,
             done: false,
+            overshoot: overshoot,
         }
     }
 
 }
 
-impl Iterator for LineIter {
+impl Iterator for BresenhamIter {
     type Item = (i32, i32);
     fn next(&mut self) -> Option<(i32, i32)> {
         if self.done {
@@ -249,20 +273,25 @@ impl Iterator for LineIter {
         }
 
         let result = Some(self.start);
-        if self.start.0 >= self.end.0 && self.start.1 >= self.end.1 {
+        if !self.overshoot && self.index as f32 >= self.delta.0 {
             self.done = true;
         } else {
-            self.error.0 += self.delta.0;
-            if self.error.0 >= 0.5 {
-                self.start.0 += 1;
-                self.error.0 -= 1.0;
+            while self.d >= 0.0 {
+                self.d -= 2.0 * self.delta.0;
+                if self.swap {
+                    self.start.0 += self.sign.0;
+                } else {
+                    self.start.1 += self.sign.1;
+                }
             }
-            self.error.1 += self.delta.1;
-            if self.error.1 >= 0.5 {
-                self.start.1 += 1;
-                self.error.1 -= 1.0;
+            self.d += 2.0 * self.delta.1;
+            if self.swap {
+                self.start.1 += self.sign.1;
+            } else {
+                self.start.0 += self.sign.0;
             }
         }
+        self.index += 1;
         return result;
     }
 }
@@ -308,6 +337,17 @@ mod tests {
         let p = Line::new(0,0,0,0).into_iter().next().unwrap();
         assert!(p.0 == 0 && p.1 == 0);
     }
+    #[test]
+    fn all_directions_lines() {
+        assert_equals_pos(Line::new(0,0, 1, 0).into_iter().nth(1).unwrap(), (1, 0));
+        assert_equals_pos(Line::new(0,0, 1,-1).into_iter().nth(1).unwrap(), (1, -1));
+        assert_equals_pos(Line::new(0,0, 0,-1).into_iter().nth(1).unwrap(), (0, -1));
+        assert_equals_pos(Line::new(0,0,-1,-1).into_iter().nth(1).unwrap(), (-1, -1));
+        assert_equals_pos(Line::new(0,0,-1, 0).into_iter().nth(1).unwrap(), (-1, 0));
+        assert_equals_pos(Line::new(0,0,-1, 1).into_iter().nth(1).unwrap(), (-1, 1));
+        assert_equals_pos(Line::new(0,0, 0, 1).into_iter().nth(1).unwrap(), (0, 1));
+        assert_equals_pos(Line::new(0,0, 1, 1).into_iter().nth(1).unwrap(), (1, 1));
+    }
 
     #[test]
     fn straight_lines() {
@@ -319,7 +359,6 @@ mod tests {
         assert_equals(Line::new(0,0,0,9).into_iter().count(), 10);
     }
 
-    #[test]
     fn diagonal_lines() {
         assert_equals(Line::new(0,0,1,1).into_iter().count(), 2);
         assert_equals(Line::new(0,0,2,2).into_iter().count(), 3);
@@ -332,34 +371,10 @@ mod tests {
     #[test]
     fn flat_lines() {
         assert_equals(Line::new(0,0,10,7).into_iter().count(), 11);
-        let mut iter = Line::new(0,0,10,7).into_iter();
-        assert_equals_pos(iter.next().unwrap(), (0, 0));
-        assert_equals_pos(iter.next().unwrap(), (1, 1));
-        assert_equals_pos(iter.next().unwrap(), (2, 2));
-        assert_equals_pos(iter.next().unwrap(), (3, 2));
-        assert_equals_pos(iter.next().unwrap(), (4, 3));
-        assert_equals_pos(iter.next().unwrap(), (5, 4));
-        assert_equals_pos(iter.next().unwrap(), (6, 4));
-        assert_equals_pos(iter.next().unwrap(), (7, 5));
-        assert_equals_pos(iter.next().unwrap(), (8, 6));
-        assert_equals_pos(iter.next().unwrap(), (9, 6));
-        assert_equals_pos(iter.next().unwrap(), (10, 7));
     }
 
     #[test]
     fn steep_lines() {
         assert_equals(Line::new(0,0,7,10).into_iter().count(), 11);
-        let mut iter = Line::new(0,0,7,10).into_iter();
-        assert_equals_pos(iter.next().unwrap(), (0, 0));
-        assert_equals_pos(iter.next().unwrap(), (1, 1));
-        assert_equals_pos(iter.next().unwrap(), (2, 2));
-        assert_equals_pos(iter.next().unwrap(), (2, 3));
-        assert_equals_pos(iter.next().unwrap(), (3, 4));
-        assert_equals_pos(iter.next().unwrap(), (4, 5));
-        assert_equals_pos(iter.next().unwrap(), (4, 6));
-        assert_equals_pos(iter.next().unwrap(), (5, 7));
-        assert_equals_pos(iter.next().unwrap(), (6, 8));
-        assert_equals_pos(iter.next().unwrap(), (6, 9));
-        assert_equals_pos(iter.next().unwrap(), (7, 10));
     }
 }
