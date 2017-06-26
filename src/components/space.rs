@@ -2,19 +2,19 @@ use std::ops::{ AddAssign, Add, Sub };
 use specs::{ Component, VecStorage };
 use geometry::{ Rect, Shape, RectIter };
 
-#[derive(Copy, Clone)]
+#[derive(Copy, Clone, Debug, PartialEq)]
 pub struct Position {
     pub x: f32,
     pub y: f32,
 }
 
-#[derive(Copy, Clone)]
+#[derive(Copy, Clone, Debug, PartialEq)]
 pub struct Spawn {
     pub x: f32,
     pub y: f32,
 }
 
-#[derive(Copy, Clone)]
+#[derive(Copy, Clone, Debug, PartialEq)]
 pub struct Vector {
     pub x: f32,
     pub y: f32,

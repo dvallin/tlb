@@ -1,3 +1,4 @@
+use components::space::{ Vector, Position };
 use std::cmp::{ min, max };
 
 pub trait Shape: Copy + IntoIterator<Item=(i32, i32)> {
@@ -23,6 +24,13 @@ pub struct Rect {
     y1: i32,
     x2: i32,
     y2: i32,
+}
+
+#[derive(Copy, Clone, Debug, PartialEq)]
+pub struct Triangle {
+    p1: (i32, i32),
+    p2: (i32, i32),
+    p3: (i32, i32),
 }
 
 impl Line {
@@ -76,6 +84,12 @@ impl Rect {
     }
 }
 
+impl Triangle {
+    pub fn new(p1: (i32, i32), p2: (i32, i32), p3: (i32, i32)) -> Self {
+        Triangle { p1: p1, p2: p2, p3: p3 }
+    }
+}
+
 impl Shape for Rect {
     fn center(&self) -> (i32, i32) {
         let center_x = (self.x1 + self.x2) / 2;
@@ -100,6 +114,60 @@ impl Shape for Rect {
     }
 }
 
+impl Shape for Triangle {
+    fn center(&self) -> (i32, i32) {
+        let center_x = (self.p1.0 + self.p2.0 + self.p3.0) / 3;
+        let center_y = (self.p1.1 + self.p2.1 + self.p3.1) / 3;
+        (center_x, center_y)
+    }
+
+    fn bounding_box(&self) -> Rect {
+        Rect {
+            x1: min(min(self.p1.0, self.p2.0), self.p3.0),
+            y1: min(min(self.p1.1, self.p2.1), self.p3.1),
+            x2: max(max(self.p1.0, self.p2.0), self.p3.0),
+            y2: max(max(self.p1.1, self.p2.1), self.p3.1),
+        }
+    }
+
+    fn is_enclosed(&self, pos: (i32, i32)) -> bool {
+        let p1 = Position { x: self.p1.0 as f32, y: self.p1.1 as f32 };
+        let p2 = Position { x: self.p2.0 as f32, y: self.p2.1 as f32 };
+        let p3 = Position { x: self.p3.0 as f32, y: self.p3.1 as f32 };
+        let ps = Position { x: pos.0 as f32, y: pos.1 as f32 };
+        let v1 = p2 - p1;
+        let v2 = p3 - p1;
+        let v3 = ps - p1;
+        let d11 = v1.dot(&v1);
+        let d12 = v1.dot(&v2);
+        let d13 = v1.dot(&v3);
+        let d22 = v2.dot(&v2);
+        let d23 = v2.dot(&v3);
+
+        let inv_denominator = 1.0 / (d11 * d22 - d12 * d12);
+        let u = (d22 * d13 - d12 * d23) * inv_denominator;
+        let v = (d11 * d23 - d12 * d13) * inv_denominator;
+
+        u >= 0.0 && v >= 0.0 && (u + v) < 1.0
+    }
+
+    fn is_boundary(&self, pos: (i32, i32)) -> bool {
+        false
+    }
+
+    fn is_interior(&self, pos: (i32, i32)) -> bool {
+        self.is_enclosed(pos)
+    }
+}
+
+impl IntoIterator for Triangle {
+    type Item = (i32, i32);
+    type IntoIter = ShapeIter<Triangle>;
+    fn into_iter(self) -> ShapeIter<Triangle> {
+        ShapeIter { shape: Box::new(self), rect: self.bounding_box().into_iter() }
+    }
+}
+
 impl IntoIterator for Line {
     type Item = (i32, i32);
     type IntoIter = LineIter;
@@ -113,6 +181,29 @@ impl IntoIterator for Rect {
     type IntoIter = RectIter;
     fn into_iter(self) -> RectIter {
         RectIter { rect: self, pos: (self.x1 - 1, self.y1) }
+    }
+}
+
+pub struct ShapeIter<T> where T: Shape {
+    shape: Box<T>,
+    rect: RectIter,
+}
+
+impl<T> Iterator for ShapeIter<T> where T: Shape {
+    type Item = (i32, i32);
+    fn next(&mut self) -> Option<(i32, i32)> {
+        let mut result = None;
+        loop {
+            if let Some(next) = self.rect.next() {
+                if self.shape.is_enclosed(next) {
+                    result = Some(next);
+                    break;
+                }
+            } else {
+                break;
+            }
+        };
+        result
     }
 }
 
