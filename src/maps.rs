@@ -51,7 +51,7 @@ impl Maps {
     pub fn find_path(&self, entity: &Entity,
                      from: (i32, i32), to: (i32, i32)) -> VecDeque<Position> {
         let callback = |start: (i32,i32), end:(i32,i32) | if
-            self.is_impassable(entity, end) { 0.0 } else { 1.0 };
+            self.is_planable(entity, end) { 0.0 } else { 1.0 };
         let mut astar = AStar::new_from_callback(MAP_WIDTH, MAP_HEIGHT, callback, 0.0);
         astar.find(from, to);
         astar.walk()
@@ -59,11 +59,13 @@ impl Maps {
             .collect::<VecDeque<Position>>()
     }
 
-    pub fn cast_ray(&self, entity: &Entity,
-                    from: (i32, i32), to: (i32, i32)) -> VecDeque<Position> {
+    pub fn draw_ray(&self, from: (i32, i32), to: (i32, i32), length: i32) -> VecDeque<Position> {
+        let p0 = Position { x: from.0 as f32 + 0.5, y: from.1 as f32 + 0.5 };
         Ray::new(from, to).into_iter()
-            .take_while(|p| !self.is_impassable(entity, *p))
+            .skip(1)
+            .take_while(|p| !self.is_projectile_blocking(*p))
             .map(|p| Position { x: p.0 as f32 + 0.5, y: p.1 as f32 + 0.5 })
+            .take_while(|p| (p0-*p).length() as i32 <= length)
             .collect::<VecDeque<Position>>()
     }
 
@@ -88,8 +90,13 @@ impl Maps {
         self.tiles.is_blocking(p)
     }
 
-    pub fn is_impassable(&self, entity: &Entity, p: (i32, i32)) -> bool {
-        !self.tiles.is_discovered(p) || self.tiles.is_blocking(p) || self.characters.get(p)
+    pub fn is_projectile_blocking(&self, p: (i32, i32)) -> bool {
+        !self.tiles.is_discovered(p) || self.tiles.is_blocking(p)
+    }
+
+    pub fn is_planable(&self, entity: &Entity, p: (i32, i32)) -> bool {
+        !self.tiles.is_discovered(p) || self.tiles.is_blocking(p)
+            || self.characters.get(p)
             .map(|e| e != *entity).unwrap_or(false)
     }
 

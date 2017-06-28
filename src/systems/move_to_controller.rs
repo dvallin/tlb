@@ -43,7 +43,7 @@ impl System<()> for MoveToController {
                 if !p.approx_equal(&next_pos) {
                     let np = move_to(p, next_pos, t, delta_time);
                     // actually walk to target
-                    if !maps.is_impassable(&id, (np.x as i32, np.y as i32)) {
+                    if !maps.is_planable(&id, (np.x as i32, np.y as i32)) {
                         maps.move_entity(Map::Character, &id,
                                         (p.x as i32, p.y as i32),
                                         (np.x as i32, np.y as i32));

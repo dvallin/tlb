@@ -4,8 +4,8 @@ use specs::{ System, RunArg, Join };
 use game_state::{ GameState };
 
 use components::space::{ Position, Vector, Viewport, mul };
-use components::player::{ Player };
-use components::common::{ Active, InTurn, InTurnState, MoveToPosition };
+use components::player::{ Player, Equipment };
+use components::common::{ Active, InTurn, MoveToPosition };
 use components::inventory::{ Inventory };
 use engine::input_handler::{ InputHandler };
 use engine::time::{ Time };
@@ -36,7 +36,7 @@ fn get_delta(input: &InputHandler) -> Vector {
 const PLAYER_SPEED: f32 = 4.0;
 impl System<()> for PlayerController {
     fn run(&mut self, arg: RunArg, _: ()) {
-        let (entities, players, actives, mut positions, mut inventories, mut move_to_positions,
+        let (entities, players, actives, mut positions, mut inventories, mut move_to_positions, mut equipments,
              mut in_turns, time, state, input, mut maps, viewport) = arg.fetch(|w| {
                  (w.entities(),
                   w.read::<Player>(),
@@ -44,6 +44,7 @@ impl System<()> for PlayerController {
                   w.write::<Position>(),
                   w.write::<Inventory>(),
                   w.write::<MoveToPosition>(),
+                  w.write::<Equipment>(),
                   w.write::<InTurn>(),
                   w.read_resource::<Time>(),
                   w.read_resource::<GameState>(),
@@ -106,8 +107,8 @@ impl System<()> for PlayerController {
                 }
             }
 
-            if let Some((id, inventory, _, _)) =
-                (&entities, &mut inventories, &players, &actives).iter().next() {
+            if let Some((id, inventory, equipment, _, _)) =
+                (&entities, &mut inventories, &mut equipments, &players, &actives).iter().next() {
                 let p = positions.get(id).unwrap().clone();
                 // player interaction
                 if input.is_char_pressed('p') {
@@ -119,6 +120,10 @@ impl System<()> for PlayerController {
                     if let Some(item_id) = inventory.pop() {
                         maps.push(Map::Item, &item_id, (p.x as i32, p.y as i32));
                         positions.insert(item_id, p);
+                    }
+                } else if let Some(digit) = input.pressed_digit {
+                    if let Some(item) = inventory.get(((digit + 9) % 10) as usize) {
+                        equipment.active_item = Some(*item);
                     }
                 }
             }

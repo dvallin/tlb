@@ -1,14 +1,15 @@
 use specs::{ System, RunArg, Join };
 
+use tcod::input::{ self, KeyCode };
 use ui::{ Ui, UiData };
 use tcod::colors::{ self, Color };
 use game_stats::{ GameStats };
 use event_log::{ EventLog, LogEvent };
-use components::player::{ Player };
+use components::player::{ Player, Equipment };
 use components::space::{ Position, Vector, Viewport };
 use components::inventory::{ Inventory };
 use engine::input_handler::{ InputHandler };
-use components::common::{ Active, InTurn, InTurnState, Description, Health };
+use components::common::{ Active, InTurn, InTurnState, Description, Health, Damage, Range };
 
 use maps::{ Map, Maps };
 
@@ -17,7 +18,7 @@ unsafe impl Sync for UiUpdater {}
 
 impl System<()> for UiUpdater {
     fn run(&mut self, arg: RunArg, _: ()) {
-        let (entities, players, positions, actives, in_turns, descriptions, health, inventories,
+        let (entities, players, positions, actives, in_turns, descriptions, health, equipments, damages, ranges, inventories,
              input, stats, log, viewport, mut maps, mut ui) = arg.fetch(|w| {
              (w.entities(),
               w.read::<Player>(),
@@ -26,6 +27,9 @@ impl System<()> for UiUpdater {
               w.read::<InTurn>(),
               w.read::<Description>(),
               w.read::<Health>(),
+              w.read::<Equipment>(),
+              w.read::<Damage>(),
+              w.read::<Range>(),
               w.read::<Inventory>(),
               w.read_resource::<InputHandler>(),
               w.read_resource::<GameStats>(),
@@ -39,7 +43,7 @@ impl System<()> for UiUpdater {
 
         ui.update("time_left".into(), UiData::Text{ text: stats.time_left().to_string() });
 
-        for (id, _, p, description, health, inventory) in (&entities, &players, &positions, &descriptions, &health, &inventories).iter() {
+        for (id, _, p, description, health, inventory, equipment) in (&entities, &players, &positions, &descriptions, &health, &inventories, &equipments).iter() {
             let active = actives.get(id);
             let in_turn = in_turns.get(id);
 
@@ -63,7 +67,7 @@ impl System<()> for UiUpdater {
                             let pos_trans = viewport.inv_transform(input.mouse_pos);
                             if let Some(pos) = maps.screen_to_map(pos_trans) {
                                 let dist = (Vector { x: p.x - pos.0 as f32, y: p.y - pos.1 as f32}).length();
-                                if !maps.is_occupied(pos) {
+                                if !input.ctrl {
                                     // render movement selection highlights
                                     let mut color = None;
                                     if turn.has_walked {
@@ -86,9 +90,13 @@ impl System<()> for UiUpdater {
                                         }
                                     }
                                 } else if dist > 0.0 {
-                                    let ray = maps.cast_ray(&id, (p.x as i32, p.y as i32), pos);
-                                    maps.set_highlight_color(colors::LIGHT_RED);
-                                    maps.add_highlights(ray);
+                                    if let Some(entity) = equipment.active_item {
+                                        if let Some(range) = ranges.get(entity) {
+                                            let ray = maps.draw_ray((p.x as i32, p.y as i32), pos, range.range);
+                                            maps.set_highlight_color(colors::LIGHT_RED);
+                                            maps.add_highlights(ray);
+                                        }
+                                    }
                                 }
                             }
                         },

@@ -24,4 +24,8 @@ impl Inventory {
     pub fn pop(&mut self) -> Option<Entity> {
         self.items.pop()
     }
+
+    pub fn get(&self, index: usize) -> Option<&Entity> {
+        self.items.get(index)
+    }
 }

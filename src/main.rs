@@ -32,10 +32,10 @@ use ui::{ Ui };
 
 use components::appearance::{ Renderable, Layer0, Layer1 };
 use components::space::{ Position, Spawn, Viewport };
-use components::player::{ Player, Fov };
+use components::player::{ Player, Fov, Equipment };
 use components::npc::{ Npc, NpcInstance };
 use components::item::{ Item, ItemInstance };
-use components::common::{ Active, InTurn, WaitForTurn,
+use components::common::{ Active, InTurn, WaitForTurn, Damage, Range,
                           MoveToPosition, Health, Description };
 use components::inventory::{ Inventory };
 
@@ -63,6 +63,7 @@ impl Game {
             .with(Description { name: name, description: "".into() })
             .with(Fov { index: fov_index })
             .with(Inventory::new())
+            .with(Equipment::new())
             .with(Layer1);
         if active {
             builder = builder.with(Active);
@@ -72,23 +73,30 @@ impl Game {
 
     fn create_npc(&mut self, x: f32, y: f32, instance: NpcInstance, world: &mut World) {
         let n = Npc { instance: instance };
-        world.create_now()
+        let builder = world.create_now()
             .with(Spawn { x: x, y: y })
             .with(components::npc::get_renderable(&n))
             .with(components::npc::get_description(&n))
             .with(components::npc::get_health(&n))
             .with(components::npc::get_inventory(&n))
             .with(n)
-            .with(Layer1)
-            .build();
+            .with(Layer1);
+        builder.build();
     }
 
     fn create_item(&mut self, x: f32, y: f32, instance: ItemInstance, world: &mut World) {
         let i = Item { instance: instance };
-        world.create_now()
+        let mut builder = world.create_now()
             .with(Spawn { x: x, y: y })
             .with(components::item::get_renderable(&i))
-            .with(components::item::get_description(&i))
+            .with(components::item::get_description(&i));
+        if let Some(c) = components::item::get_damage(&i) {
+            builder = builder.with(c)
+        }
+        if let Some(c) = components::item::get_range(&i) {
+            builder = builder.with(c)
+        }
+        builder
             .with(i)
             .with(Layer0)
             .build();
@@ -242,7 +250,10 @@ fn main() {
         .register::<InTurn>()
         .register::<WaitForTurn>()
         .register::<Inventory>()
+        .register::<Equipment>()
         .register::<Health>()
+        .register::<Damage>()
+        .register::<Range>()
         .register::<MoveToPosition>()
         .with::<PlayerController>(PlayerController, "player_controller_system", 1)
         .with::<MoveToController>(MoveToController, "move_to_controller_system", 1)

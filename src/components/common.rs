@@ -12,6 +12,13 @@ pub struct Health {
     pub health: f32,
 }
 
+pub struct Damage {
+    pub damage: f32,
+}
+pub struct Range {
+    pub range: i32,
+}
+
 pub struct MoveToPosition {
     pub path: VecDeque<Position>,
     pub speed: f32,
@@ -28,6 +35,14 @@ impl Component for MoveToPosition {
 
 impl Component for Health {
     type Storage = HashMapStorage<Health>;
+}
+
+impl Component for Damage {
+    type Storage = HashMapStorage<Damage>;
+}
+
+impl Component for Range {
+    type Storage = HashMapStorage<Range>;
 }
 
 pub struct Active;
