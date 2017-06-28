@@ -36,6 +36,12 @@ pub struct Triangle {
     p2: (i32, i32),
     p3: (i32, i32),
 }
+#[derive(Copy, Clone, Debug, PartialEq)]
+pub struct Ellipse {
+    center: (i32, i32),
+    radius: (i32, i32),
+}
+
 
 impl Line {
     pub fn new(x1: i32, y1: i32, x2: i32, y2: i32) -> Self {
@@ -99,6 +105,15 @@ impl Rect {
 impl Triangle {
     pub fn new(p1: (i32, i32), p2: (i32, i32), p3: (i32, i32)) -> Self {
         Triangle { p1: p1, p2: p2, p3: p3 }
+    }
+}
+
+impl Ellipse {
+    pub fn new(center: (i32, i32), radius: (i32, i32)) -> Self {
+        Ellipse{ center: center, radius: radius }
+    }
+    pub fn circle(center: (i32, i32), radius: i32) -> Self {
+        Ellipse{ center: center, radius: (radius, radius) }
     }
 }
 
@@ -172,10 +187,48 @@ impl Shape for Triangle {
     }
 }
 
+impl Shape for Ellipse {
+    fn center(&self) -> (i32, i32) {
+        self.center
+    }
+
+    fn bounding_box(&self) -> Rect {
+        Rect {
+            x1: self.center.0 - self.radius.0,
+            y1: self.center.1 - self.radius.1,
+            x2: self.center.0 + self.radius.0,
+            y2: self.center.1 + self.radius.1,
+        }
+    }
+
+    fn is_enclosed(&self, pos: (i32, i32)) -> bool {
+        let p = (self.center.0 - pos.0, self.center.1 - pos.1);
+        let a = (p.0 * p.0) / (self.radius.0 * self.radius.0);
+        let b = (p.1 * p.1) / (self.radius.1 * self.radius.1);
+        a + b <= 1
+    }
+
+    fn is_boundary(&self, pos: (i32, i32)) -> bool {
+        false
+    }
+
+    fn is_interior(&self, pos: (i32, i32)) -> bool {
+        self.is_enclosed(pos)
+    }
+}
+
 impl IntoIterator for Triangle {
     type Item = (i32, i32);
     type IntoIter = ShapeIter<Triangle>;
     fn into_iter(self) -> ShapeIter<Triangle> {
+        ShapeIter { shape: Box::new(self), rect: self.bounding_box().into_iter() }
+    }
+}
+
+impl IntoIterator for Ellipse {
+    type Item = (i32, i32);
+    type IntoIter = ShapeIter<Ellipse>;
+    fn into_iter(self) -> ShapeIter<Ellipse> {
         ShapeIter { shape: Box::new(self), rect: self.bounding_box().into_iter() }
     }
 }

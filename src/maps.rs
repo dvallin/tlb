@@ -69,6 +69,20 @@ impl Maps {
             .collect::<VecDeque<Position>>()
     }
 
+    pub fn collect_characters_with_ray(&self,
+                            from: (i32, i32), to: (i32, i32), length: i32) -> VecDeque<Entity> {
+        let p0 = Position { x: from.0 as f32 + 0.5, y: from.1 as f32 + 0.5 };
+        Ray::new(from, to).into_iter()
+            .skip(1)
+            .take_while(|p| !self.is_projectile_blocking(*p))
+            .take_while(|p| {
+                let ps = Position { x: p.0 as f32 + 0.5, y: p.1 as f32 + 0.5 };
+                (p0-ps).length() as i32 <= length
+            })
+            .filter_map(|p| self.characters.get(p))
+            .collect::<VecDeque<Entity>>()
+    }
+
     pub fn clear_highlights(&mut self) {
         self.highlights.clear();
     }
