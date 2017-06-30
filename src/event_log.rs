@@ -3,6 +3,8 @@ use specs::{ Entity };
 
 pub enum LogEvent {
     FinishedTurn(Entity),
+    Died(Entity),
+    DidDamage(Entity, Entity, f32),
 }
 
 

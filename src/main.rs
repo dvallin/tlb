@@ -14,7 +14,7 @@ mod game_stats;
 mod game_state;
 mod event_log;
 
-use specs::{ World, Join };
+use specs::{ World, Join, Entity };
 
 use engine::state::{ State, Transition };
 use engine::input_handler::{ InputHandler };
@@ -35,8 +35,8 @@ use components::space::{ Position, Spawn, Viewport };
 use components::player::{ Player, Fov, Equipment };
 use components::npc::{ Npc, NpcInstance };
 use components::item::{ Item, ItemInstance };
-use components::common::{ Active, InTurn, WaitForTurn, Damage, Range,
-                          MoveToPosition, Health, Description };
+use components::common::{ Active, InTurn, WaitForTurn, CharacterStats,
+                          MoveToPosition, ItemStats, Description };
 use components::inventory::{ Inventory };
 
 use geometry::{ Rect };
@@ -44,6 +44,7 @@ use geometry::{ Rect };
 use systems::player_controller::{ PlayerController };
 use systems::move_to_controller::{ MoveToController };
 use systems::round_scheduler::{ RoundScheduler };
+use systems::stats_updater::{ StatsUpdater };
 use systems::ui::{ UiUpdater };
 
 const TORCH_RADIUS: i32 = 10;
@@ -57,9 +58,9 @@ impl Game {
 
         let mut builder = world.create_now()
             .with(Player)
-            .with(Spawn { x: x, y: y })
+            .with(Spawn::for_location(x, y))
             .with(Renderable { character: '@', color: colors::WHITE })
-            .with(Health { health: 100.0 } )
+            .with(CharacterStats { health: 100.0, max_health: 100.0 } )
             .with(Description { name: name, description: "".into() })
             .with(Fov { index: fov_index })
             .with(Inventory::new())
@@ -71,29 +72,43 @@ impl Game {
         builder.build();
     }
 
-    fn create_npc(&mut self, x: f32, y: f32, instance: NpcInstance, world: &mut World) {
+    fn create_npc(&mut self, x: f32, y: f32, instance: NpcInstance, world: &mut World) -> Entity {
         let n = Npc { instance: instance };
         let builder = world.create_now()
-            .with(Spawn { x: x, y: y })
+            .with(Spawn::for_location(x, y))
             .with(components::npc::get_renderable(&n))
             .with(components::npc::get_description(&n))
-            .with(components::npc::get_health(&n))
-            .with(components::npc::get_inventory(&n))
+            .with(components::npc::get_stats(&n))
+            .with(Inventory::new())
             .with(n)
             .with(Layer1);
-        builder.build();
+        builder.build()
+    }
+
+    fn create_inventory(&mut self, owner: Entity, items: Vec<ItemInstance>, world: &mut World) {
+        let mut inventory = Inventory::new();
+        for instance in items {
+            let i = Item { instance: instance };
+            let mut item = world.create_now()
+                .with(Spawn::for_owner(owner))
+                .with(components::item::get_renderable(&i))
+                .with(components::item::get_description(&i));
+            if let Some(c) = components::item::get_stats(&i) {
+                item = item.with(c)
+            }
+            item = item.with(i).with(Layer0);
+            inventory.items.push(item.build());
+        }
+        world.write().insert(owner, inventory);
     }
 
     fn create_item(&mut self, x: f32, y: f32, instance: ItemInstance, world: &mut World) {
         let i = Item { instance: instance };
         let mut builder = world.create_now()
-            .with(Spawn { x: x, y: y })
+            .with(Spawn::for_location(x, y))
             .with(components::item::get_renderable(&i))
             .with(components::item::get_description(&i));
-        if let Some(c) = components::item::get_damage(&i) {
-            builder = builder.with(c)
-        }
-        if let Some(c) = components::item::get_range(&i) {
+        if let Some(c) = components::item::get_stats(&i) {
             builder = builder.with(c)
         }
         builder
@@ -106,8 +121,14 @@ impl Game {
         let entities = world.entities();
         let mut stats = world.write_resource::<GameStats>();
         let mut positions = world.write::<Position>();
+        let mut inventories = world.write::<Inventory>();
+        let mut char_stats = world.write::<CharacterStats>();
         let mut maps = world.write_resource::<Maps>();
         let mut state = world.write_resource::<GameState>();
+
+        let mut in_turns = world.write::<InTurn>();
+        let mut waits = world.write::<WaitForTurn>();
+        let mut moves = world.write::<MoveToPosition>();
 
         let spawns = world.read::<Spawn>();
         let players = world.read::<Player>();
@@ -116,16 +137,29 @@ impl Game {
 
         state.reset();
 
+        in_turns.clear();
+        waits.clear();
+        moves.clear();
+
         maps.clear_all();
         for (id, spawn) in (&entities, &spawns).iter() {
-            positions.insert(id, Position { x: spawn.x, y: spawn.y });
+            if let Some(loc) = spawn.location {
+                positions.insert(id, Position { x: loc.0, y: loc.1 });
+            } else if let Some(owner) = spawn.owner {
+                if positions.remove(id).is_some() {
+                    if let Some(inventory) = inventories.get_mut(owner) {
+                        inventory.push(id);
+                    }
+                }
+            }
         }
 
         for (id, _, pos) in (&entities, &players, &mut positions).iter() {
             maps.push(Map::Character, &id, (pos.x as i32, pos.y as i32));
         }
-        for (id, _, pos) in (&entities, &npcs, &mut positions).iter() {
+        for (id, _, pos, stats) in (&entities, &npcs, &mut positions, &mut char_stats).iter() {
             maps.push(Map::Character, &id, (pos.x as i32, pos.y as i32));
+            stats.reset();
         }
         for (id, _, pos) in (&entities, &items, &mut positions).iter() {
             maps.push(Map::Item, &id, (pos.x as i32, pos.y as i32));
@@ -157,7 +191,10 @@ impl State for Game {
         self.create_player(15.0, 15.0, true, "Colton".into(), tcod, world);
         self.create_player(16.0, 16.0, false, "Gage".into(), tcod, world);
 
-        self.create_npc(31.0, 24.0, NpcInstance::Guard, world);
+        {
+            let guard = self.create_npc(31.0, 24.0, NpcInstance::Guard, world);
+            self.create_inventory(guard, vec![ItemInstance::FlickKnife, ItemInstance::Watch], world);
+        }
         self.create_npc(29.0, 24.0, NpcInstance::Technician, world);
         self.create_npc(31.0, 29.0, NpcInstance::Accountant, world);
 
@@ -251,13 +288,13 @@ fn main() {
         .register::<WaitForTurn>()
         .register::<Inventory>()
         .register::<Equipment>()
-        .register::<Health>()
-        .register::<Damage>()
-        .register::<Range>()
+        .register::<CharacterStats>()
+        .register::<ItemStats>()
         .register::<MoveToPosition>()
         .with::<PlayerController>(PlayerController, "player_controller_system", 1)
         .with::<MoveToController>(MoveToController, "move_to_controller_system", 1)
-        .with::<RoundScheduler>(RoundScheduler, "round_scheduler_system", 1)
+        .with::<RoundScheduler>(RoundScheduler, "round_scheduler_system", 2)
+        .with::<StatsUpdater>(StatsUpdater, "stats_updater_system", 2)
         .with::<UiUpdater>(UiUpdater, "ui_updater_system", 2)
         .build()
         .run();

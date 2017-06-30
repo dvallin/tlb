@@ -1,6 +1,6 @@
 use tcod::colors::{ self };
 use specs::{ Component, HashMapStorage };
-use components::common::{ Health, Description };
+use components::common::{ CharacterStats, Description };
 use components::inventory::{ Inventory };
 use components::appearance::{ Renderable };
 
@@ -36,10 +36,6 @@ pub fn get_description(npc: &Npc) -> Description {
     }
 }
 
-pub fn get_health(_npc: &Npc) -> Health {
-    Health { health: 100.0 }
-}
-
-pub fn get_inventory(_npc: &Npc) -> Inventory {
-    Inventory::new()
+pub fn get_stats(_npc: &Npc) -> CharacterStats {
+    CharacterStats { health: 100.0, max_health: 100.0 }
 }

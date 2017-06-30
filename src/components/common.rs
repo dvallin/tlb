@@ -8,15 +8,26 @@ pub struct Description {
     pub description: String,
 }
 
-pub struct Health {
+pub struct CharacterStats {
     pub health: f32,
+    pub max_health: f32,
 }
 
-pub struct Damage {
+pub struct ItemStats {
     pub damage: f32,
-}
-pub struct Range {
     pub range: i32,
+}
+
+impl CharacterStats {
+    pub fn apply_damage(&mut self, item: &ItemStats) -> f32 {
+        let damage = item.damage;
+        self.health -= damage;
+        damage
+    }
+
+    pub fn reset(&mut self) {
+        self.health = self.max_health;
+    }
 }
 
 pub struct MoveToPosition {
@@ -32,17 +43,12 @@ impl Component for MoveToPosition {
     type Storage = VecStorage<MoveToPosition>;
 }
 
-
-impl Component for Health {
-    type Storage = HashMapStorage<Health>;
+impl Component for CharacterStats {
+    type Storage = HashMapStorage<CharacterStats>;
 }
 
-impl Component for Damage {
-    type Storage = HashMapStorage<Damage>;
-}
-
-impl Component for Range {
-    type Storage = HashMapStorage<Range>;
+impl Component for ItemStats {
+    type Storage = HashMapStorage<ItemStats>;
 }
 
 pub struct Active;
@@ -54,6 +60,7 @@ impl Component for Active {
 pub enum InTurnState {
     Idle,
     Walking,
+    Fighting,
 }
 
 pub struct InTurn {
@@ -73,6 +80,11 @@ impl InTurn {
         self.state = InTurnState::Walking;
         self.has_walked = true;
         self.action_points -= cost;
+    }
+
+    pub fn fight(&mut self) {
+        self.state = InTurnState::Fighting;
+        self.action_points = 0;
     }
 
     pub fn is_done(&self) -> bool {

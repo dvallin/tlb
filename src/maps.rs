@@ -162,6 +162,13 @@ impl Maps {
         }
     }
 
+    pub fn remove(&mut self, map: Map, entity: &Entity, p: (i32, i32)) -> Option<Entity> {
+        match map {
+            Map::Item => self.items.remove(entity, p),
+            Map::Character => self.characters.remove(entity, p),
+        }
+    }
+
     pub fn push(&mut self, map: Map, entity: &Entity, p: (i32, i32)) {
         match map {
             Map::Item => self.items.push(entity, p),

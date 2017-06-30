@@ -1,6 +1,6 @@
 use specs::{ Component, HashMapStorage, VecStorage, Entity };
 use components::appearance::{ Renderable };
-use components::common::{ Description, Damage, Range };
+use components::common::{ Description, ItemStats };
 use tcod::colors::{ self };
 
 pub enum Type {
@@ -58,24 +58,13 @@ pub fn get_renderable(item: &Item) -> Renderable {
         })
 }
 
-pub fn get_damage(item: &Item) -> Option<Damage> {
+pub fn get_stats(item: &Item) -> Option<ItemStats> {
     use self::ItemInstance::*;
     match item.instance {
-        FlickKnife => Some (Damage { damage: 5.0 }),
-        Shuriken => Some (Damage { damage: 5.0 }),
-        Manriki => Some (Damage { damage: 10.0 }),
-        DartGun => Some (Damage { damage: 20.0 }),
-        _ => None,
-    }
-}
-
-pub fn get_range(item: &Item) -> Option<Range> {
-    use self::ItemInstance::*;
-    match item.instance {
-        FlickKnife => Some (Range { range: 1 }),
-        Shuriken => Some (Range { range: 5 }),
-        Manriki => Some (Range { range: 2 }),
-        DartGun => Some (Range { range: 10 }),
+        FlickKnife => Some (ItemStats { damage: 20.0, range: 1 }),
+        Shuriken => Some (ItemStats { damage: 20.0, range: 5 }),
+        Manriki => Some (ItemStats { damage: 40.0, range: 2 }),
+        DartGun => Some (ItemStats { damage: 80.0, range: 10 }),
         _ => None,
     }
 }

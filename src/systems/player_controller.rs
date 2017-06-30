@@ -5,11 +5,12 @@ use game_state::{ GameState };
 
 use components::space::{ Position, Vector, Viewport, mul };
 use components::player::{ Player, Equipment };
-use components::common::{ Active, InTurn, MoveToPosition };
+use components::common::{ Active, InTurn, MoveToPosition, CharacterStats, ItemStats };
 use components::inventory::{ Inventory };
 use engine::input_handler::{ InputHandler };
 use engine::time::{ Time };
 
+use event_log::{ EventLog, LogEvent };
 use maps::{ Map, Maps };
 
 pub struct PlayerController;
@@ -37,7 +38,7 @@ const PLAYER_SPEED: f32 = 4.0;
 impl System<()> for PlayerController {
     fn run(&mut self, arg: RunArg, _: ()) {
         let (entities, players, actives, mut positions, mut inventories, mut move_to_positions, mut equipments,
-             mut in_turns, time, state, input, mut maps, viewport) = arg.fetch(|w| {
+             mut char_stats, item_stats, mut in_turns, time, state, input, mut log, mut maps, viewport) = arg.fetch(|w| {
                  (w.entities(),
                   w.read::<Player>(),
                   w.read::<Active>(),
@@ -45,10 +46,13 @@ impl System<()> for PlayerController {
                   w.write::<Inventory>(),
                   w.write::<MoveToPosition>(),
                   w.write::<Equipment>(),
+                  w.write::<CharacterStats>(),
+                  w.read::<ItemStats>(),
                   w.write::<InTurn>(),
                   w.read_resource::<Time>(),
                   w.read_resource::<GameState>(),
                   w.read_resource::<InputHandler>(),
+                  w.write_resource::<EventLog>(),
                   w.write_resource::<Maps>(),
                   w.read_resource::<Viewport>())
         });
@@ -56,26 +60,42 @@ impl System<()> for PlayerController {
         let delta_time = time.delta_time.subsec_nanos() as f32 / 1.0e9;
 
         if state.is_turn_based {
-            if let Some ((id, p, _, _, in_turn)) = (&entities, &positions, &actives, &players, &mut in_turns).iter().next() {
+            if let Some ((id, p, _, _, in_turn, equipment)) = (&entities, &positions, &actives, &players, &mut in_turns, &equipments).iter().next() {
                 if input.is_mouse_pressed() {
                     // create automatic movement
                     let pos_trans = viewport.inv_transform(input.mouse_pos);
                     if let Some(pos) = maps.screen_to_map(pos_trans) {
                         if viewport.visible(pos_trans) {
                             let dist = (Vector { x: p.x - pos.0 as f32, y: p.y - pos.1 as f32}).length();
-                            let mut cost = None;
-                            if dist < 5.0 {
-                                cost = Some(1);
-                            } else if dist < 10.0 && !in_turn.has_walked {
-                                cost = Some(2)
-                            }
+                            if !input.ctrl {
+                                let mut cost = None;
+                                if dist < 5.0 {
+                                    cost = Some(1);
+                                } else if dist < 10.0 && !in_turn.has_walked {
+                                    cost = Some(2)
+                                }
 
-                            if let Some(c) = cost {
-                                // set the position to the middle of the cell to avoid twitching.
-                                let path = maps.find_path(&id, (p.x as i32, p.y as i32), pos);
-                                move_to_positions.insert(id, MoveToPosition { path: path,
-                                                                              speed: PLAYER_SPEED });
-                                in_turn.walk(c);
+                                if let Some(c) = cost {
+                                    // set the position to the middle of the cell to avoid twitching.
+                                    let path = maps.find_path(&id, (p.x as i32, p.y as i32), pos);
+                                    move_to_positions.insert(id, MoveToPosition { path: path,
+                                                                                speed: PLAYER_SPEED });
+                                    in_turn.walk(c);
+                                }
+                            } else {
+                                if let Some(entity) = equipment.active_item {
+                                    if let Some(item_stat) = item_stats.get(entity) {
+                                        let characters = maps.collect_characters_with_ray((p.x as i32, p.y as i32), pos, item_stat.range);
+                                        if let Some(target) = characters.front() {
+                                            if let Some(character_stat) = char_stats.get_mut(*target) {
+                                                let damage = character_stat.apply_damage(item_stat);
+                                                log.log(LogEvent::DidDamage(id, *target, damage));
+                                                in_turn.fight();
+                                                in_turn.action_done();
+                                            }
+                                        }
+                                    }
+                                }
                             }
                         }
                     }

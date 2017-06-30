@@ -1,5 +1,5 @@
 use std::ops::{ AddAssign, Add, Sub };
-use specs::{ Component, VecStorage };
+use specs::{ Component, VecStorage, Entity };
 use geometry::{ Rect, Shape, RectIter };
 
 #[derive(Copy, Clone, Debug, PartialEq)]
@@ -10,8 +10,18 @@ pub struct Position {
 
 #[derive(Copy, Clone, Debug, PartialEq)]
 pub struct Spawn {
-    pub x: f32,
-    pub y: f32,
+    pub owner: Option<Entity>,
+    pub location: Option<(f32, f32)>,
+}
+
+impl Spawn {
+    pub fn for_location(x: f32, y: f32) -> Self {
+        Spawn { owner: None, location: Some((x, y)) }
+    }
+
+    pub fn for_owner(owner: Entity) -> Self {
+        Spawn { owner: Some(owner), location: None }
+    }
 }
 
 #[derive(Copy, Clone, Debug, PartialEq)]
