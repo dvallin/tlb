@@ -1,7 +1,7 @@
 use specs::{ System, RunArg, Join };
 
 use ui::{ Ui, UiData };
-use tcod::colors::{ self };
+use tcod::colors::{ self, Color };
 use game_stats::{ GameStats };
 use event_log::{ EventLog, LogEvent };
 use components::player::{ Player, Equipment };
@@ -14,6 +14,21 @@ use maps::{ Maps };
 
 pub struct UiUpdater;
 unsafe impl Sync for UiUpdater {}
+
+fn distance_color(dist: usize, turn: &InTurn) -> Option<Color> {
+    if turn.has_walked {
+        if dist < 5 {
+            return Some(colors::LIGHT_ORANGE);
+        }
+    } else {
+        if dist < 5 {
+            return Some(colors::LIGHT_GREEN);
+        } else if dist < 10 {
+            return Some(colors::LIGHT_ORANGE);
+        }
+    }
+    None
+}
 
 impl System<()> for UiUpdater {
     fn run(&mut self, arg: RunArg, _: ()) {
@@ -65,30 +80,18 @@ impl System<()> for UiUpdater {
                         InTurnState::Idle => {
                             let pos_trans = viewport.inv_transform(input.mouse_pos);
                             if let Some(pos) = maps.screen_to_map(pos_trans) {
-                                let dist = (Vector { x: p.x - pos.0 as f32, y: p.y - pos.1 as f32}).length();
                                 if !input.ctrl {
                                     // render movement selection highlights
-                                    let mut color = None;
-                                    if turn.has_walked {
-                                        if dist < 5.0 {
-                                            color = Some(colors::LIGHT_ORANGE);
-                                        }
-                                    } else {
-                                        if dist < 5.0 {
-                                            color = Some(colors::LIGHT_GREEN);
-                                        } else if dist < 10.0 {
-                                            color = Some(colors::LIGHT_ORANGE);
-                                        }
-                                    }
-
                                     if viewport.visible(pos) {
+                                        let path = maps.find_path(&id, (p.x as i32, p.y as i32), pos);
+                                        let color = distance_color(path.len(), &turn);
+
                                         if let Some(c) = color {
-                                            let path = maps.find_path(&id, (p.x as i32, p.y as i32), pos);
                                             maps.set_highlight_color(c);
                                             maps.add_highlights(path);
                                         }
                                     }
-                                } else if dist > 0.0 {
+                                } else {
                                     if let Some(entity) = equipment.active_item {
                                         if let Some(item_stat) = item_stats.get(entity) {
                                             let ray = maps.draw_ray((p.x as i32, p.y as i32), pos, item_stat.range);
