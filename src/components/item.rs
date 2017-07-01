@@ -20,6 +20,7 @@ pub enum Rarity {
 
 pub enum ItemInstance {
     DartGun,
+    KeyCard(i32),
     FlickKnife,
     HitachiRam,
     Lighter,
@@ -84,6 +85,14 @@ pub fn get_type(item: &Item) -> (Rarity, Type) {
         DartGun => (Rare, Weapon),
 
         HitachiRam => (Epic, Item),
+
+        KeyCard(level) => {
+            match level {
+                3 | 4 | 5 => (Uncommon, Equipment),
+                6 | 7 | 8 => (Rare, Equipment),
+                _ => (Common, Equipment),
+            }
+        }
     }
 }
 
@@ -99,5 +108,6 @@ pub fn get_description(item: &Item) -> Description {
         Shuriken => Description::new("Shuriken", "A traditional japanese conceiled weapon"),
         Simstim => Description::new("Simstim deck", "Remotly simulates stimuli captured from another person to the wearer"),
         Watch => Description::new("Watch", "A plastic watch"),
+        KeyCard(level) => Description::new(&format!("Level {} keycard", level), &format!("A plastic keycard giving access to security level {}", level)),
     }
 }

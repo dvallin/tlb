@@ -1,3 +1,4 @@
+use std::slice::Iter;
 use specs::{ Entity };
 
 const MAP_WIDTH: i32 = 80;
@@ -81,5 +82,9 @@ impl EntityStackMap {
 
     pub fn pop(&mut self, p: (i32, i32)) -> Option<Entity> {
         self.map[p.0 as usize][p.1 as usize].pop()
+    }
+
+    pub fn get(&self, p: (i32, i32)) -> Iter<Entity> {
+        self.map[p.0 as usize][p.1 as usize].iter()
     }
 }

@@ -37,6 +37,7 @@ use components::npc::{ Npc, NpcInstance };
 use components::item::{ Item, ItemInstance };
 use components::common::{ Active, InTurn, WaitForTurn, CharacterStats,
                           MoveToPosition, ItemStats, Description };
+use components::interaction::{ Interactable };
 use components::inventory::{ Inventory };
 
 use geometry::{ Rect };
@@ -285,6 +286,7 @@ fn main() {
         .register::<Description>()
         .register::<Active>()
         .register::<InTurn>()
+        .register::<Interactable>()
         .register::<WaitForTurn>()
         .register::<Inventory>()
         .register::<Equipment>()

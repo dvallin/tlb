@@ -3,7 +3,7 @@ use engine::tcod::{ Tcod };
 use tcod::pathfinding::{ AStar };
 use tcod::colors::{ self, Color };
 use tile_map::{ TileMap };
-use geometry::{ Ray };
+use geometry::{ Shape, Ray };
 use components::space::{ Viewport, Position };
 use entity_map::{ EntityMap, EntityStackMap };
 use specs::{ Entity };
@@ -81,6 +81,19 @@ impl Maps {
             })
             .filter_map(|p| self.characters.get(p))
             .collect::<VecDeque<Entity>>()
+    }
+
+    pub fn collect_characters_with_shape<T>(&self, shape: T) -> Vec<Entity> where T: Shape {
+        shape.into_iter()
+            .filter_map(|p| self.characters.get(p))
+            .collect::<Vec<Entity>>()
+    }
+
+    pub fn collect_items_with_shape<T>(&self, shape: T) -> Vec<Entity> where T: Shape {
+        shape.into_iter()
+            .flat_map(|p| self.items.get(p))
+            .map(|e| *e)
+            .collect::<Vec<Entity>>()
     }
 
     pub fn clear_highlights(&mut self) {

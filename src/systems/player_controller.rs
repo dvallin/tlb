@@ -3,10 +3,14 @@ use specs::{ System, RunArg, Join };
 
 use game_state::{ GameState };
 
+use geometry::{ Rect };
+
 use components::space::{ Position, Vector, Viewport, mul };
 use components::player::{ Player, Equipment };
 use components::common::{ Active, InTurn, MoveToPosition, CharacterStats, ItemStats };
 use components::inventory::{ Inventory };
+use components::interaction::{ Interactable };
+use components::item::{ Item };
 use engine::input_handler::{ InputHandler };
 use engine::time::{ Time };
 
@@ -46,17 +50,19 @@ fn distance_cost(dist: usize, turn: &InTurn) -> Option<i32> {
 const PLAYER_SPEED: f32 = 4.0;
 impl System<()> for PlayerController {
     fn run(&mut self, arg: RunArg, _: ()) {
-        let (entities, players, actives, mut positions, mut inventories, mut move_to_positions, mut equipments,
-             mut char_stats, item_stats, mut in_turns, time, state, input, mut log, mut maps, viewport) = arg.fetch(|w| {
+        let (entities, players, actives, mut positions, mut interactables, mut inventories, mut move_to_positions, mut equipments,
+             mut char_stats, item_stats, items, mut in_turns, time, state, input, mut log, mut maps, viewport) = arg.fetch(|w| {
                  (w.entities(),
                   w.read::<Player>(),
                   w.read::<Active>(),
                   w.write::<Position>(),
+                  w.write::<Interactable>(),
                   w.write::<Inventory>(),
                   w.write::<MoveToPosition>(),
                   w.write::<Equipment>(),
                   w.write::<CharacterStats>(),
                   w.read::<ItemStats>(),
+                  w.read::<Item>(),
                   w.write::<InTurn>(),
                   w.read_resource::<Time>(),
                   w.read_resource::<GameState>(),
@@ -101,7 +107,7 @@ impl System<()> for PlayerController {
                 }
             }
         } else {
-            if let Some((id, p, _, _)) = (&entities, &positions, &players, &actives).iter().next() {
+            if let Some((id, p, _, _, equipment)) = (&entities, &positions, &players, &actives, &equipments).iter().next() {
                 if input.is_mouse_pressed() {
                     let pos_trans = viewport.inv_transform(input.mouse_pos);
                     if let Some(pos) = maps.screen_to_map(pos_trans) {
@@ -120,6 +126,28 @@ impl System<()> for PlayerController {
                         path.push_back(np);
                         move_to_positions.insert(id, MoveToPosition { path: path,
                                                                       speed: PLAYER_SPEED });
+                    }
+
+                    if input.is_char_pressed('e') {
+                        let pos = (p.x as i32, p.y as i32);
+                        let targets = maps.collect_characters_with_shape(Rect::new(pos.0 - 1, pos.1 - 1, 3, 3));
+
+                        let active_item = equipment.active_item.and_then(|i| items.get(i));
+                        let passive_item = equipment.passive_item.and_then(|i| items.get(i));
+                        let clothing = equipment.clothing.and_then(|i| items.get(i));
+
+                        let first_interactable_id = targets.iter()
+                            .filter(|i| {
+                                if let Some(interaction) = interactables.get(**i) {
+                                    interaction.interacts_with(&active_item, &passive_item, &clothing)
+                                } else {
+                                    false
+                                }
+                            })
+                            .next();
+                        if let Some(target) = first_interactable_id.and_then(|i| interactables.get_mut(*i)) {
+                            target.interact_with(&active_item, &passive_item, &clothing);
+                        }
                     }
                 }
             }
