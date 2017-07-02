@@ -55,7 +55,7 @@ impl Tcod {
         self.fov.len() - 1
     }
 
-    pub fn initialize_fov(&mut self, index: usize, maps: &Maps) {
+    pub fn update_fov(&mut self, index: usize, maps: &Maps) {
         for y in 0..MAP_HEIGHT {
             for x in 0..MAP_WIDTH {
                 let see_through = !maps.is_sight_blocking((x, y));
@@ -63,6 +63,10 @@ impl Tcod {
                 self.fov[index].set(x, y, see_through, walk_through);
             }
         }
+    }
+
+    pub fn compute_fov(&mut self, index: usize, p: (i32, i32), radius: i32) {
+        self.fov[index].compute_fov(p.0, p.1, radius, FOV_LIGHT_WALLS, FOV_ALGO);
     }
 
     pub fn clear(&mut self, color: Color) {
@@ -128,9 +132,5 @@ impl Tcod {
             self.panel.put_char(rect.left(), i, chars::VLINE, BackgroundFlag::None);
             self.panel.put_char(rect.right(), i, chars::VLINE, BackgroundFlag::None);
         }
-    }
-
-    pub fn compute_fov(&mut self, index: usize, p: (i32, i32), radius: i32) {
-        self.fov[index].compute_fov(p.0, p.1, radius, FOV_LIGHT_WALLS, FOV_ALGO);
     }
 }

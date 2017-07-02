@@ -142,7 +142,6 @@ impl Game {
         let mut moves = world.write::<MoveToPosition>();
 
         let spawns = world.read::<Spawn>();
-        let fovs = world.read::<Fov>();
         let players = world.read::<Player>();
         let npcs = world.read::<Npc>();
         let items = world.read::<Item>();
@@ -185,10 +184,6 @@ impl Game {
         }
         for (id, _, pos) in (&entities, &items, &mut positions).iter() {
             maps.push(Map::Item, &id, (pos.x as i32, pos.y as i32));
-        }
-
-        for fov in (&fovs).iter() {
-            tcod.initialize_fov(fov.index, &maps);
         }
 
         stats.reset();
@@ -267,8 +262,16 @@ impl State for Game {
             self.reset_world(tcod, world);
         }
 
+        let state = world.read_resource::<GameState>();
         let fovs = world.read::<Fov>();
         let positions = world.read::<Position>();
+
+        if state.fov_needs_update {
+            let maps = world.read_resource::<Maps>();
+            for fov in (&fovs).iter() {
+                tcod.update_fov(fov.index, &maps);
+            }
+        }
         for (fov, position) in (&fovs, &positions).iter() {
             tcod.compute_fov(fov.index, (position.x as i32, position.y as i32), TORCH_RADIUS);
         }
