@@ -5,7 +5,7 @@ use tcod::colors::{ self, Color };
 use tile_map::{ TileMap };
 use geometry::{ Shape, Ray };
 use components::space::{ Viewport, Position };
-use entity_map::{ EntityMap, EntityStackMap };
+use entity_map::{ EntityMap, Entry };
 use specs::{ Entity };
 
 const SCREEN_WIDTH: i32 = 80;
@@ -22,7 +22,7 @@ pub enum Map {
 
 pub struct Maps {
     characters: EntityMap,
-    items: EntityStackMap,
+    items: EntityMap,
     tiles: TileMap,
     highlights: Vec<(i32, i32)>,
     highlight_color: Color,
@@ -32,7 +32,7 @@ impl Maps {
     pub fn new() -> Self {
         Maps {
             characters: EntityMap::new(),
-            items: EntityStackMap::new(),
+            items: EntityMap::new(),
             tiles: TileMap::new(),
             highlights: vec![],
             highlight_color: colors::LIGHT_GREEN,
@@ -51,7 +51,7 @@ impl Maps {
     pub fn find_path(&self, entity: &Entity,
                      from: (i32, i32), to: (i32, i32)) -> VecDeque<Position> {
         let callback = |start: (i32,i32), end:(i32,i32) | if
-            self.is_planable(entity, end) { 0.0 } else { 1.0 };
+            self.is_not_planable(entity, end) { 0.0 } else { 1.0 };
         let mut astar = AStar::new_from_callback(MAP_WIDTH, MAP_HEIGHT, callback, 0.0);
         astar.find(from, to);
         astar.walk()
@@ -79,20 +79,22 @@ impl Maps {
                 let ps = Position { x: p.0 as f32 + 0.5, y: p.1 as f32 + 0.5 };
                 (p0-ps).length() as i32 <= length
             })
-            .filter_map(|p| self.characters.get(p))
+            .flat_map(|p| self.characters.get(p))
+            .map(|e| e.0)
             .collect::<VecDeque<Entity>>()
     }
 
     pub fn collect_characters_with_shape<T>(&self, shape: T) -> Vec<Entity> where T: Shape {
         shape.into_iter()
-            .filter_map(|p| self.characters.get(p))
+            .flat_map(|p| self.characters.get(p))
+            .map(|e| e.0)
             .collect::<Vec<Entity>>()
     }
 
     pub fn collect_items_with_shape<T>(&self, shape: T) -> Vec<Entity> where T: Shape {
         shape.into_iter()
             .flat_map(|p| self.items.get(p))
-            .map(|e| *e)
+            .map(|e| e.0)
             .collect::<Vec<Entity>>()
     }
 
@@ -121,18 +123,14 @@ impl Maps {
         !self.tiles.is_discovered(p) || self.tiles.is_blocking(p)
     }
 
-    pub fn is_planable(&self, entity: &Entity, p: (i32, i32)) -> bool {
+    pub fn is_not_planable(&self, entity: &Entity, p: (i32, i32)) -> bool {
         !self.tiles.is_discovered(p) || self.tiles.is_blocking(p)
-            || self.characters.get(p)
-            .map(|e| e != *entity).unwrap_or(false)
+            || self.characters.get(p).iter().any(|e| e.0 != *entity && e.1 )
     }
 
     pub fn is_sight_blocking(&self, p: (i32, i32)) -> bool {
         self.tiles.is_sight_blocking(p)
-    }
-
-    pub fn is_occupied(&self, p: (i32, i32)) -> bool {
-        self.characters.get(p).is_some()
+            || self.characters.get(p).iter().any(|e| e.2 )
     }
 
     pub fn build(&mut self) {
@@ -164,18 +162,19 @@ impl Maps {
         if from.0 != to.0 || from.1 != to.1 {
             match map {
                 Map::Item => {
-                    self.items.remove(entity, from);
-                    self.items.push(entity, to);
-                },
+                    if let Some(entry) = self.items.remove(entity, from) {
+                        self.items.push_entry(entry, to);
+                    }                },
                 Map::Character => {
-                    self.characters.remove(entity, from);
-                    self.characters.push(entity, to);
-                },
+                    if let Some(entry) = self.characters.remove(entity, from) {
+                        self.characters.push_entry(entry, to);
+                    }
+                }
             }
         }
     }
 
-    pub fn remove(&mut self, map: Map, entity: &Entity, p: (i32, i32)) -> Option<Entity> {
+    pub fn remove(&mut self, map: Map, entity: &Entity, p: (i32, i32)) -> Option<Entry> {
         match map {
             Map::Item => self.items.remove(entity, p),
             Map::Character => self.characters.remove(entity, p),
@@ -189,10 +188,24 @@ impl Maps {
         }
     }
 
-    pub fn pop(&mut self, map: Map, p: (i32, i32)) -> Option<Entity> {
+    pub fn pop(&mut self, map: Map, p: (i32, i32)) -> Option<Entry> {
         match map {
             Map::Item => self.items.pop(p),
             Map::Character => self.items.pop(p),
+        }
+    }
+
+    pub fn set_blocking(&mut self, map: Map, entity: &Entity, p: (i32, i32), blocking: bool) {
+        match map {
+            Map::Item => self.items.set_blocking(entity, p, blocking),
+            Map::Character => self.characters.set_blocking(entity, p, blocking),
+        }
+    }
+
+    pub fn set_sight_blocking(&mut self, map: Map, entity: &Entity, p: (i32, i32), blocking: bool) {
+        match map {
+            Map::Item => self.items.set_sight_blocking(entity, p, blocking),
+            Map::Character => self.characters.set_sight_blocking(entity, p, blocking),
         }
     }
 }

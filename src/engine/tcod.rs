@@ -55,8 +55,7 @@ impl Tcod {
         self.fov.len() - 1
     }
 
-    pub fn initialize_fov(&mut self, index: usize, world: &mut World) {
-        let maps = world.read_resource::<Maps>();
+    pub fn initialize_fov(&mut self, index: usize, maps: &Maps) {
         for y in 0..MAP_HEIGHT {
             for x in 0..MAP_WIDTH {
                 let see_through = !maps.is_sight_blocking((x, y));

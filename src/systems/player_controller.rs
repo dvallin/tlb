@@ -9,7 +9,8 @@ use components::space::{ Position, Vector, Viewport, mul };
 use components::player::{ Player, Equipment };
 use components::common::{ Active, InTurn, MoveToPosition, CharacterStats, ItemStats };
 use components::inventory::{ Inventory };
-use components::interaction::{ Interactable };
+use components::appearance::{ Renderable };
+use components::interaction::{ Interactable, Interaction };
 use components::item::{ Item };
 use engine::input_handler::{ InputHandler };
 use engine::time::{ Time };
@@ -50,16 +51,18 @@ fn distance_cost(dist: usize, turn: &InTurn) -> Option<i32> {
 const PLAYER_SPEED: f32 = 4.0;
 impl System<()> for PlayerController {
     fn run(&mut self, arg: RunArg, _: ()) {
-        let (entities, players, actives, mut positions, mut interactables, mut inventories, mut move_to_positions, mut equipments,
+        let (entities, players, actives, mut positions, mut interactables, mut interactions, mut inventories, mut move_to_positions, mut equipments, mut renderables,
              mut char_stats, item_stats, items, mut in_turns, time, state, input, mut log, mut maps, viewport) = arg.fetch(|w| {
                  (w.entities(),
                   w.read::<Player>(),
                   w.read::<Active>(),
                   w.write::<Position>(),
                   w.write::<Interactable>(),
+                  w.write::<Interaction>(),
                   w.write::<Inventory>(),
                   w.write::<MoveToPosition>(),
                   w.write::<Equipment>(),
+                  w.write::<Renderable>(),
                   w.write::<CharacterStats>(),
                   w.read::<ItemStats>(),
                   w.read::<Item>(),
@@ -107,7 +110,7 @@ impl System<()> for PlayerController {
                 }
             }
         } else {
-            if let Some((id, p, _, _, equipment)) = (&entities, &positions, &players, &actives, &equipments).iter().next() {
+            if let Some((id, p, _, _)) = (&entities, &positions, &players, &actives).iter().next() {
                 if input.is_mouse_pressed() {
                     let pos_trans = viewport.inv_transform(input.mouse_pos);
                     if let Some(pos) = maps.screen_to_map(pos_trans) {
@@ -130,23 +133,14 @@ impl System<()> for PlayerController {
 
                     if input.is_char_pressed('e') {
                         let pos = (p.x as i32, p.y as i32);
-                        let targets = maps.collect_characters_with_shape(Rect::new(pos.0 - 1, pos.1 - 1, 3, 3));
+                        let targets = maps.collect_characters_with_shape(
+                            Rect::new(pos.0 - 1, pos.1 - 1, 3, 3));
 
-                        let active_item = equipment.active_item.and_then(|i| items.get(i));
-                        let passive_item = equipment.passive_item.and_then(|i| items.get(i));
-                        let clothing = equipment.clothing.and_then(|i| items.get(i));
-
-                        let first_interactable_id = targets.iter()
-                            .filter(|i| {
-                                if let Some(interaction) = interactables.get(**i) {
-                                    interaction.interacts_with(&active_item, &passive_item, &clothing)
-                                } else {
-                                    false
-                                }
-                            })
+                        let first_interactable_id = targets.into_iter()
+                            .filter(|i| interactables.get(*i).is_some())
                             .next();
-                        if let Some(target) = first_interactable_id.and_then(|i| interactables.get_mut(*i)) {
-                            target.interact_with(&active_item, &passive_item, &clothing);
+                        if let Some(target_id) = first_interactable_id {
+                            interactions.insert(target_id, Interaction { actor: id });
                         }
                     }
                 }
@@ -157,13 +151,15 @@ impl System<()> for PlayerController {
             let p = positions.get(id).unwrap().clone();
             // player interaction
             if input.is_char_pressed('p') {
-                if let Some(item_id) = maps.pop(Map::Item, (p.x as i32, p.y as i32)) {
-                    inventory.push(item_id);
-                    positions.remove(item_id);
+                if let Some(entry) = maps.pop(Map::Item, (p.x as i32, p.y as i32)) {
+                    inventory.push(entry.0);
+                    positions.remove(entry.0);
                 }
             } else if input.is_char_pressed('d') {
                 if let Some(item_id) = inventory.pop() {
                     maps.push(Map::Item, &item_id, (p.x as i32, p.y as i32));
+                    maps.set_blocking(Map::Item, &item_id, (p.x as i32, p.y as i32), false);
+                    maps.set_sight_blocking(Map::Item, &item_id, (p.x as i32, p.y as i32), false);
                     positions.insert(item_id, p);
                 }
             } else if let Some(digit) = input.pressed_digit {

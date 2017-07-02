@@ -23,7 +23,7 @@ impl System<()> for StatsUpdater {
 
         let mut graveyard = vec![];
         for (id, stats, pos) in (&entities, &char_stats, &positions).iter() {
-            if stats.health == 0.0 {
+            if stats.health <= 0.0 {
                 graveyard.push((id, *pos));
                 log.log(LogEvent::Died(id));
             }

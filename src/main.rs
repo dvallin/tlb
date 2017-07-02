@@ -37,12 +37,13 @@ use components::npc::{ Npc, NpcInstance };
 use components::item::{ Item, ItemInstance };
 use components::common::{ Active, InTurn, WaitForTurn, CharacterStats,
                           MoveToPosition, ItemStats, Description };
-use components::interaction::{ Interactable };
+use components::interaction::{ Interactable, InteractableInstance, Interaction };
 use components::inventory::{ Inventory };
 
 use geometry::{ Rect };
 
 use systems::player_controller::{ PlayerController };
+use systems::interaction_system::{ InteractionSystem };
 use systems::move_to_controller::{ MoveToController };
 use systems::round_scheduler::{ RoundScheduler };
 use systems::stats_updater::{ StatsUpdater };
@@ -55,8 +56,6 @@ impl Game {
     fn create_player(&mut self, x: f32, y: f32, active: bool, name: String,
                      tcod: &mut Tcod, world: &mut World) {
         let fov_index = tcod.create_fov();
-        tcod.initialize_fov(fov_index, world);
-
         let mut builder = world.create_now()
             .with(Player)
             .with(Spawn::for_location(x, y))
@@ -83,6 +82,16 @@ impl Game {
             .with(Inventory::new())
             .with(n)
             .with(Layer1);
+        builder.build()
+    }
+
+    fn create_interactable(&mut self, x: f32, y: f32, instance: InteractableInstance, world: &mut World) -> Entity {
+        let interactable = Interactable::new(instance);
+        let builder = world.create_now()
+            .with(Spawn::for_location(x, y))
+            .with(interactable.get_renderable())
+            .with(interactable)
+            .with(Layer0);
         builder.build()
     }
 
@@ -118,12 +127,13 @@ impl Game {
             .build();
     }
 
-    fn reset_world(&mut self, world: &mut World) {
+    fn reset_world(&mut self, tcod: &mut Tcod, world: &mut World) {
         let entities = world.entities();
         let mut stats = world.write_resource::<GameStats>();
         let mut positions = world.write::<Position>();
         let mut inventories = world.write::<Inventory>();
         let mut char_stats = world.write::<CharacterStats>();
+        let mut interactables = world.write::<Interactable>();
         let mut maps = world.write_resource::<Maps>();
         let mut state = world.write_resource::<GameState>();
 
@@ -132,6 +142,7 @@ impl Game {
         let mut moves = world.write::<MoveToPosition>();
 
         let spawns = world.read::<Spawn>();
+        let fovs = world.read::<Fov>();
         let players = world.read::<Player>();
         let npcs = world.read::<Npc>();
         let items = world.read::<Item>();
@@ -154,6 +165,16 @@ impl Game {
                 }
             }
         }
+        for (_, interactable) in (&entities, &mut interactables).iter() {
+            interactable.reset();
+        }
+
+        for (id, interactable, pos) in (&entities, &mut interactables, &mut positions).iter() {
+            let p = (pos.x as i32, pos.y as i32);
+            maps.push(Map::Character, &id, p);
+            maps.set_blocking(Map::Character, &id, p, interactable.is_blocking());
+            maps.set_sight_blocking(Map::Character, &id, p, interactable.is_sight_blocking());
+        }
 
         for (id, _, pos) in (&entities, &players, &mut positions).iter() {
             maps.push(Map::Character, &id, (pos.x as i32, pos.y as i32));
@@ -164,6 +185,10 @@ impl Game {
         }
         for (id, _, pos) in (&entities, &items, &mut positions).iter() {
             maps.push(Map::Item, &id, (pos.x as i32, pos.y as i32));
+        }
+
+        for fov in (&fovs).iter() {
+            tcod.initialize_fov(fov.index, &maps);
         }
 
         stats.reset();
@@ -192,14 +217,19 @@ impl State for Game {
         self.create_player(15.0, 15.0, true, "Colton".into(), tcod, world);
         self.create_player(16.0, 16.0, false, "Gage".into(), tcod, world);
 
+        self.create_interactable(25.0, 21.0, InteractableInstance::KeyDoor(3, false), world);
+
         {
             let guard = self.create_npc(31.0, 24.0, NpcInstance::Guard, world);
-            self.create_inventory(guard, vec![ItemInstance::FlickKnife, ItemInstance::Watch], world);
+            self.create_inventory(guard, vec![ItemInstance::FlickKnife,
+                                              ItemInstance::Watch,
+                                              ItemInstance::KeyCard(3)], world);
         }
         self.create_npc(29.0, 24.0, NpcInstance::Technician, world);
         self.create_npc(31.0, 29.0, NpcInstance::Accountant, world);
 
         self.create_item(14.0, 15.0, ItemInstance::FlickKnife, world);
+        self.create_item(13.0, 15.0, ItemInstance::DartGun, world);
         self.create_item(33.0, 25.0, ItemInstance::Simstim, world);
         self.create_item(23.0, 25.0, ItemInstance::HitachiRam, world);
         self.create_item(28.0, 21.0, ItemInstance::Shuriken, world);
@@ -212,7 +242,7 @@ impl State for Game {
         ui.add("inactive_player".into(), Rect::new(67, 1, 11, 2));
         world.add_resource::<Ui>(ui);
 
-        self.reset_world(world);
+        self.reset_world(tcod, world);
     }
 
     fn handle_events(&mut self, tcod: &mut Tcod, world: &mut World) -> Transition {
@@ -234,7 +264,7 @@ impl State for Game {
             do_reset = input.is_key_pressed(KeyCode::Backspace) || stats.time_left() < 0;
         }
         if do_reset {
-            self.reset_world(world);
+            self.reset_world(tcod, world);
         }
 
         let fovs = world.read::<Fov>();
@@ -287,6 +317,7 @@ fn main() {
         .register::<Active>()
         .register::<InTurn>()
         .register::<Interactable>()
+        .register::<Interaction>()
         .register::<WaitForTurn>()
         .register::<Inventory>()
         .register::<Equipment>()
@@ -295,6 +326,7 @@ fn main() {
         .register::<MoveToPosition>()
         .with::<PlayerController>(PlayerController, "player_controller_system", 1)
         .with::<MoveToController>(MoveToController, "move_to_controller_system", 1)
+        .with::<InteractionSystem>(InteractionSystem, "interaction_system", 1)
         .with::<RoundScheduler>(RoundScheduler, "round_scheduler_system", 2)
         .with::<StatsUpdater>(StatsUpdater, "stats_updater_system", 2)
         .with::<UiUpdater>(UiUpdater, "ui_updater_system", 2)

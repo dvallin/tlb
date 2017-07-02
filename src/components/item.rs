@@ -1,4 +1,4 @@
-use specs::{ Component, HashMapStorage, VecStorage, Entity };
+use specs::{ Component, VecStorage };
 use components::appearance::{ Renderable };
 use components::common::{ Description, ItemStats };
 use tcod::colors::{ self };
