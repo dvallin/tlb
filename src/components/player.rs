@@ -1,4 +1,6 @@
+use std::collections::{ HashMap };
 use specs::{ Component, HashMapStorage, Entity };
+use components::space::{ Level };
 
 pub struct Player;
 
@@ -7,7 +9,7 @@ impl Component for Player {
 }
 
 pub struct Fov {
-    pub index: usize,
+    pub fov_map: HashMap<Level, usize>,
 }
 
 impl Component for Fov {

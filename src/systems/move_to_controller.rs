@@ -1,10 +1,10 @@
 use specs::{ System, RunArg, Join };
 
-use components::space::{ Position, mul, Viewport };
+use components::space::{ Position, Level, mul, Viewport };
 use components::common::{ Active, MoveToPosition };
 use engine::time::{ Time };
 
-use maps::{ Map, Maps };
+use maps::{ Map, Tower };
 
 pub struct MoveToController;
 unsafe impl Sync for MoveToController {}
@@ -23,21 +23,23 @@ fn move_to(pos: &Position, next_pos: &Position, movement: &MoveToPosition, delta
 
 impl System<()> for MoveToController {
     fn run(&mut self, arg: RunArg, _: ()) {
-        let (entities, mut positions, mut move_to_positions, time,
-             actives,  mut maps, mut viewport) = arg.fetch(|w| {
+        let (entities, mut positions, levels, mut move_to_positions, time,
+             actives,  mut tower, mut viewport) = arg.fetch(|w| {
                  (w.entities(),
                   w.write::<Position>(),
+                  w.read::<Level>(),
                   w.write::<MoveToPosition>(),
                   w.read_resource::<Time>(),
                   w.read::<Active>(),
-                  w.write_resource::<Maps>(),
+                  w.write_resource::<Tower>(),
                   w.write_resource::<Viewport>())
              });
 
         let delta_time = time.delta_time.subsec_nanos() as f32 / 1.0e9;
 
         let mut finished_entities = vec![];
-        for (id, p, t) in (&entities, &mut positions, &mut move_to_positions).iter() {
+        for (id, p, level, t) in (&entities, &mut positions, &levels, &mut move_to_positions).iter() {
+            let maps = tower.get_mut(level).unwrap();
             // map last to is_reached? using the walking function
             if t.path.front().map_or(false, |next_pos|
                 if !p.approx_equal(&next_pos) {

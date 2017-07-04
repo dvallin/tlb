@@ -24,14 +24,14 @@ use engine::tcod::{ Tcod };
 use tcod::colors::{ self };
 use tcod::input::{ KeyCode };
 
-use maps::{ Maps, Map };
+use maps::{ Tower, Map };
 use game_stats::{ GameStats };
 use game_state::{ GameState };
 use event_log::{ EventLog };
 use ui::{ Ui };
 
 use components::appearance::{ Renderable, Layer0, Layer1 };
-use components::space::{ Position, Spawn, Viewport };
+use components::space::{ Position, Spawn, Viewport, Level };
 use components::player::{ Player, Fov, Equipment };
 use components::npc::{ Npc, NpcInstance };
 use components::item::{ Item, ItemInstance };
@@ -53,16 +53,16 @@ const TORCH_RADIUS: i32 = 10;
 struct Game;
 
 impl Game {
-    fn create_player(&mut self, x: f32, y: f32, active: bool, name: String,
+    fn create_player(&mut self, x: f32, y: f32, tower: &Tower, active: bool, name: String,
                      tcod: &mut Tcod, world: &mut World) {
-        let fov_index = tcod.create_fov();
+        let fov_map = tower.create_fov(tcod);
         let mut builder = world.create_now()
             .with(Player)
-            .with(Spawn::for_location(x, y))
+            .with(Spawn::for_location(x, y, Level::Tower(0)))
             .with(Renderable { character: '@', color: colors::WHITE })
             .with(CharacterStats { health: 100.0, max_health: 100.0 } )
             .with(Description { name: name, description: "".into() })
-            .with(Fov { index: fov_index })
+            .with(Fov { fov_map: fov_map})
             .with(Inventory::new())
             .with(Equipment::new())
             .with(Layer1);
@@ -72,10 +72,11 @@ impl Game {
         builder.build();
     }
 
-    fn create_npc(&mut self, x: f32, y: f32, instance: NpcInstance, world: &mut World) -> Entity {
+    fn create_npc(&mut self, x: f32, y: f32, level: Level,
+                  instance: NpcInstance, world: &mut World) -> Entity {
         let n = Npc { instance: instance };
         let builder = world.create_now()
-            .with(Spawn::for_location(x, y))
+            .with(Spawn::for_location(x, y, level))
             .with(components::npc::get_renderable(&n))
             .with(components::npc::get_description(&n))
             .with(components::npc::get_stats(&n))
@@ -85,10 +86,11 @@ impl Game {
         builder.build()
     }
 
-    fn create_interactable(&mut self, x: f32, y: f32, instance: InteractableInstance, world: &mut World) -> Entity {
+    fn create_interactable(&mut self, x: f32, y: f32, level: Level,
+                           instance: InteractableInstance, world: &mut World) -> Entity {
         let interactable = Interactable::new(instance);
         let builder = world.create_now()
-            .with(Spawn::for_location(x, y))
+            .with(Spawn::for_location(x, y, level))
             .with(interactable.get_renderable())
             .with(interactable)
             .with(Layer0);
@@ -112,10 +114,11 @@ impl Game {
         world.write().insert(owner, inventory);
     }
 
-    fn create_item(&mut self, x: f32, y: f32, instance: ItemInstance, world: &mut World) {
+    fn create_item(&mut self, x: f32, y: f32, level: Level,
+                   instance: ItemInstance, world: &mut World) {
         let i = Item { instance: instance };
         let mut builder = world.create_now()
-            .with(Spawn::for_location(x, y))
+            .with(Spawn::for_location(x, y, level))
             .with(components::item::get_renderable(&i))
             .with(components::item::get_description(&i));
         if let Some(c) = components::item::get_stats(&i) {
@@ -131,10 +134,11 @@ impl Game {
         let entities = world.entities();
         let mut stats = world.write_resource::<GameStats>();
         let mut positions = world.write::<Position>();
+        let mut levels = world.write::<Level>();
         let mut inventories = world.write::<Inventory>();
         let mut char_stats = world.write::<CharacterStats>();
         let mut interactables = world.write::<Interactable>();
-        let mut maps = world.write_resource::<Maps>();
+        let mut tower = world.write_resource::<Tower>();
         let mut state = world.write_resource::<GameState>();
 
         let mut in_turns = world.write::<InTurn>();
@@ -152,12 +156,14 @@ impl Game {
         waits.clear();
         moves.clear();
 
-        maps.clear_all();
+        tower.clear();
         for (id, spawn) in (&entities, &spawns).iter() {
             if let Some(loc) = spawn.location {
                 positions.insert(id, Position { x: loc.0, y: loc.1 });
+                levels.insert(id, loc.2);
             } else if let Some(owner) = spawn.owner {
                 if positions.remove(id).is_some() {
+                    levels.remove(id);
                     if let Some(inventory) = inventories.get_mut(owner) {
                         inventory.push(id);
                     }
@@ -168,22 +174,30 @@ impl Game {
             interactable.reset();
         }
 
-        for (id, interactable, pos) in (&entities, &mut interactables, &mut positions).iter() {
+        for (id, interactable, pos, level) in (&entities, &mut interactables, &mut positions, &mut levels).iter() {
             let p = (pos.x as i32, pos.y as i32);
-            maps.push(Map::Character, &id, p);
-            maps.set_blocking(Map::Character, &id, p, interactable.is_blocking());
-            maps.set_sight_blocking(Map::Character, &id, p, interactable.is_sight_blocking());
+            if let Some(maps) = tower.get_mut(level) {
+                maps.push(Map::Character, &id, p);
+                maps.set_blocking(Map::Character, &id, p, interactable.is_blocking());
+                maps.set_sight_blocking(Map::Character, &id, p, interactable.is_sight_blocking());
+            }
         }
 
-        for (id, _, pos) in (&entities, &players, &mut positions).iter() {
-            maps.push(Map::Character, &id, (pos.x as i32, pos.y as i32));
+        for (id, _, pos, level) in (&entities, &players, &mut positions, &mut levels).iter() {
+            if let Some(maps) = tower.get_mut(level) {
+                maps.push(Map::Character, &id, (pos.x as i32, pos.y as i32));
+            }
         }
-        for (id, _, pos, stats) in (&entities, &npcs, &mut positions, &mut char_stats).iter() {
-            maps.push(Map::Character, &id, (pos.x as i32, pos.y as i32));
+        for (id, _, pos, stats, level) in (&entities, &npcs, &mut positions, &mut char_stats, &mut levels).iter() {
+            if let Some(maps) = tower.get_mut(level) {
+                maps.push(Map::Character, &id, (pos.x as i32, pos.y as i32));
+            }
             stats.reset();
         }
-        for (id, _, pos) in (&entities, &items, &mut positions).iter() {
-            maps.push(Map::Item, &id, (pos.x as i32, pos.y as i32));
+        for (id, _, pos, level) in (&entities, &items, &mut positions, &mut levels).iter() {
+            if let Some(maps) = tower.get_mut(level) {
+                maps.push(Map::Item, &id, (pos.x as i32, pos.y as i32));
+            }
         }
 
         stats.reset();
@@ -205,29 +219,33 @@ impl State for Game {
         world.add_resource::<GameState>(GameState::default());
         world.add_resource::<EventLog>(EventLog::default());
         world.add_resource::<Viewport>(Viewport::new(15, 15, 80, 40));
-        let mut maps = Maps::new();
-        maps.build();
-        world.add_resource::<Maps>(maps);
 
-        self.create_player(15.0, 15.0, true, "Colton".into(), tcod, world);
-        self.create_player(16.0, 16.0, false, "Gage".into(), tcod, world);
+        let mut tower = Tower::new(&[Level::Tower(0)]);
+        tower.build();
 
-        self.create_interactable(25.0, 21.0, InteractableInstance::KeyDoor(3, false), world);
+        self.create_player(15.0, 15.0, &tower, true, "Colton".into(), tcod, world);
+        self.create_player(16.0, 16.0, &tower, false, "Gage".into(), tcod, world);
+
+        self.create_interactable(25.0, 21.0, Level::Tower(0),
+                                 InteractableInstance::KeyDoor(3, false), world);
 
         {
-            let guard = self.create_npc(31.0, 24.0, NpcInstance::Guard, world);
+            let guard = self.create_npc(31.0, 24.0, Level::Tower(0),
+                                        NpcInstance::Guard, world);
             self.create_inventory(guard, vec![ItemInstance::FlickKnife,
                                               ItemInstance::Watch,
                                               ItemInstance::KeyCard(3)], world);
         }
-        self.create_npc(29.0, 24.0, NpcInstance::Technician, world);
-        self.create_npc(31.0, 29.0, NpcInstance::Accountant, world);
+        self.create_npc(29.0, 24.0, Level::Tower(0), NpcInstance::Technician, world);
+        self.create_npc(31.0, 29.0, Level::Tower(0), NpcInstance::Accountant, world);
 
-        self.create_item(14.0, 15.0, ItemInstance::FlickKnife, world);
-        self.create_item(13.0, 15.0, ItemInstance::DartGun, world);
-        self.create_item(33.0, 25.0, ItemInstance::Simstim, world);
-        self.create_item(23.0, 25.0, ItemInstance::HitachiRam, world);
-        self.create_item(28.0, 21.0, ItemInstance::Shuriken, world);
+        self.create_item(14.0, 15.0, Level::Tower(0), ItemInstance::FlickKnife, world);
+        self.create_item(13.0, 15.0, Level::Tower(0), ItemInstance::DartGun, world);
+        self.create_item(33.0, 25.0, Level::Tower(0), ItemInstance::Simstim, world);
+        self.create_item(23.0, 25.0, Level::Tower(0), ItemInstance::HitachiRam, world);
+        self.create_item(28.0, 21.0, Level::Tower(0), ItemInstance::Shuriken, world);
+
+        world.add_resource::<Tower>(tower);
 
         let mut ui = Ui::new();
         ui.add("active_player".into(), Rect::new(1, 1, 11, 2));
@@ -265,19 +283,22 @@ impl State for Game {
         let state = world.read_resource::<GameState>();
         let fovs = world.read::<Fov>();
         let positions = world.read::<Position>();
+        let levels = world.read::<Level>();
 
         if state.fov_needs_update {
-            let maps = world.read_resource::<Maps>();
-            for fov in (&fovs).iter() {
-                tcod.update_fov(fov.index, &maps);
+            let tower = world.read_resource::<Tower>();
+            for (fov, level) in (&fovs, &levels).iter() {
+                tcod.update_fov(*fov.fov_map.get(level).unwrap(),
+                                tower.get(level).unwrap());
             }
         }
-        for (fov, position) in (&fovs, &positions).iter() {
-            tcod.compute_fov(fov.index, (position.x as i32, position.y as i32), TORCH_RADIUS);
+        for (fov, position, level) in (&fovs, &positions, &levels).iter() {
+            tcod.compute_fov(*fov.fov_map.get(level).unwrap(),
+                             (position.x as i32, position.y as i32), TORCH_RADIUS);
         }
 
-        let mut tilemap = world.write_resource::<Maps>();
-        tilemap.update(tcod);
+        let mut tower = world.write_resource::<Tower>();
+        tower.update(tcod);
 
         Transition::None
     }
@@ -287,14 +308,18 @@ impl State for Game {
         let positions = world.read::<Position>();
         let layer0 = world.read::<Layer0>();
         let layer1 = world.read::<Layer1>();
-        let maps = world.read_resource::<Maps>();
+        let actives = world.read::<Active>();
+        let levels = world.read::<Level>();
+        let tower = world.read_resource::<Tower>();
         let ui = world.read_resource::<Ui>();
         let viewport = world.read_resource::<Viewport>();
 
         tcod.clear(colors::BLACK);
 
         {
-            maps.draw(tcod, &viewport);
+            if let Some((level, _)) = (&levels, &actives).iter().next() {
+                tower.draw(level, tcod, &viewport);
+            }
             ui.draw(tcod);
 
             for (_, renderable, position) in (&layer0, &renderables, &positions).iter() {
@@ -312,6 +337,7 @@ impl State for Game {
 fn main() {
     ApplicationBuilder::new(Game)
         .register::<Player>()
+        .register::<Level>()
         .register::<Npc>()
         .register::<Spawn>()
         .register::<Item>()

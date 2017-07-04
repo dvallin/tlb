@@ -5,12 +5,12 @@ use tcod::colors::{ self, Color };
 use game_stats::{ GameStats };
 use event_log::{ EventLog, LogEvent };
 use components::player::{ Player, Equipment };
-use components::space::{ Position, Vector, Viewport };
+use components::space::{ Position, Level, Viewport };
 use components::inventory::{ Inventory };
 use engine::input_handler::{ InputHandler };
 use components::common::{ Active, InTurn, InTurnState, Description, CharacterStats, ItemStats };
 
-use maps::{ Maps };
+use maps::{ Tower };
 
 pub struct UiUpdater;
 unsafe impl Sync for UiUpdater {}
@@ -32,12 +32,13 @@ fn distance_color(dist: usize, turn: &InTurn) -> Option<Color> {
 
 impl System<()> for UiUpdater {
     fn run(&mut self, arg: RunArg, _: ()) {
-        let (entities, players, positions, actives, in_turns, descriptions,
+        let (entities, players, positions, levels, actives, in_turns, descriptions,
              equipments, item_stats, char_stats, inventories,
-             input, stats, log, viewport, mut maps, mut ui) = arg.fetch(|w| {
+             input, stats, log, viewport, mut tower, mut ui) = arg.fetch(|w| {
              (w.entities(),
               w.read::<Player>(),
               w.read::<Position>(),
+              w.read::<Level>(),
               w.read::<Active>(),
               w.read::<InTurn>(),
               w.read::<Description>(),
@@ -49,15 +50,15 @@ impl System<()> for UiUpdater {
               w.read_resource::<GameStats>(),
               w.read_resource::<EventLog>(),
               w.read_resource::<Viewport>(),
-              w.write_resource::<Maps>(),
+              w.write_resource::<Tower>(),
               w.write_resource::<Ui>())
         });
 
-        maps.clear_highlights();
+        tower.clear_highlights();
 
         ui.update("time_left".into(), UiData::Text{ text: stats.time_left().to_string() });
 
-        for (id, _, p, description, stats, inventory, equipment) in (&entities, &players, &positions, &descriptions, &char_stats, &inventories, &equipments).iter() {
+        for (id, _, p, level, description, stats, inventory, equipment) in (&entities, &players, &positions, &levels, &descriptions, &char_stats, &inventories, &equipments).iter() {
             let active = actives.get(id);
             let in_turn = in_turns.get(id);
 
@@ -75,35 +76,40 @@ impl System<()> for UiUpdater {
                         .collect()
                 });
 
-                if let Some(turn) = in_turn {
-                    match turn.state {
-                        InTurnState::Idle => {
-                            let pos_trans = viewport.inv_transform(input.mouse_pos);
-                            if let Some(pos) = maps.screen_to_map(pos_trans) {
-                                if !input.ctrl {
-                                    // render movement selection highlights
-                                    if viewport.visible(pos) {
-                                        let path = maps.find_path(&id, (p.x as i32, p.y as i32), pos);
-                                        let color = distance_color(path.len(), &turn);
-
-                                        if let Some(c) = color {
-                                            maps.set_highlight_color(c);
-                                            maps.add_highlights(path);
+                let mut highlights = None;
+                {
+                    let maps = tower.get(level).unwrap();
+                    if let Some(turn) = in_turn {
+                        match turn.state {
+                            InTurnState::Idle => {
+                                let pos_trans = viewport.inv_transform(input.mouse_pos);
+                                if let Some(pos) = maps.screen_to_map(pos_trans) {
+                                    if !input.ctrl {
+                                        // render movement selection highlights
+                                        if viewport.visible(pos) {
+                                            let path = maps.find_path(&id, (p.x as i32, p.y as i32), pos);
+                                            let color = distance_color(path.len(), &turn);
+                                            if let Some(c) = color {
+                                                highlights = Some((c, path))
+                                            }
                                         }
-                                    }
-                                } else {
-                                    if let Some(entity) = equipment.active_item {
-                                        if let Some(item_stat) = item_stats.get(entity) {
-                                            let ray = maps.draw_ray((p.x as i32, p.y as i32), pos, item_stat.range);
-                                            maps.set_highlight_color(colors::LIGHT_RED);
-                                            maps.add_highlights(ray);
+                                    } else {
+                                        if let Some(entity) = equipment.active_item {
+                                            if let Some(item_stat) = item_stats.get(entity) {
+                                                let ray = maps.draw_ray((p.x as i32, p.y as i32), pos, item_stat.range);
+                                                highlights = Some((colors::LIGHT_RED, ray));
+                                            }
                                         }
                                     }
                                 }
-                            }
-                        },
-                        _ => (),
+                            },
+                            _ => (),
+                        }
                     }
+                }
+                if let Some((color, path)) = highlights {
+                    tower.set_highlight_color(color);
+                    tower.add_highlights(path);
                 }
             }
 

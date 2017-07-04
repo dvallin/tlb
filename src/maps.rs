@@ -4,7 +4,8 @@ use tcod::pathfinding::{ AStar };
 use tcod::colors::{ self, Color };
 use tile_map::{ TileMap };
 use geometry::{ Shape, Ray };
-use components::space::{ Viewport, Position };
+use std::collections::{ HashMap };
+use components::space::{ Viewport, Position, Level };
 use entity_map::{ EntityMap, Entry };
 use specs::{ Entity };
 
@@ -20,12 +21,95 @@ pub enum Map {
     Character,
 }
 
+pub struct Tower {
+    maps: HashMap<Level, Maps>,
+    highlights: Vec<(i32, i32)>,
+    highlight_color: Color,
+}
+
+impl Tower {
+    pub fn new(levels: &[Level]) -> Self {
+        let mut maps = HashMap::new();
+        for level in levels {
+            maps.insert(*level, Maps::new());
+        }
+        Tower {
+            maps: maps,
+            highlights: vec![],
+            highlight_color: colors::LIGHT_GREEN,
+        }
+    }
+
+    pub fn build(&mut self) {
+        for (level, maps) in &mut self.maps {
+            maps.build();
+        }
+    }
+
+    pub fn clear(&mut self) {
+        for (level, maps) in &mut self.maps {
+            maps.clear_all();
+        }
+    }
+
+    pub fn get_mut(&mut self, level: &Level) -> Option<&mut Maps> {
+        self.maps.get_mut(level)
+    }
+
+    pub fn get(&self, level: &Level) -> Option<&Maps> {
+        self.maps.get(level)
+    }
+
+    pub fn update(&mut self, tcod: &mut Tcod) {
+        for (level, maps) in &mut self.maps {
+            maps.update(tcod);
+        }
+    }
+
+    pub fn draw(&self, level: &Level, tcod: &mut Tcod, viewport: &Viewport) {
+        if let Some(map) = self.maps.get(level) {
+            map.draw(tcod, viewport);
+        }
+
+        for pos in self.highlights.iter() {
+            let pixel = *pos;
+            if viewport.visible(pixel) {
+                let p = viewport.transform(pixel);
+                tcod.highlight(p, self.highlight_color);
+            }
+        }
+    }
+
+    pub fn create_fov(&self, tcod: &mut Tcod) -> HashMap<Level, usize> {
+        let mut result = HashMap::new();
+        for (level, maps) in &self.maps {
+            result.insert(*level, tcod.create_fov());
+        }
+        result
+    }
+
+    pub fn clear_highlights(&mut self) {
+        self.highlights.clear();
+    }
+
+    pub fn set_highlight_color(&mut self, color: Color) {
+        self.highlight_color = color;
+    }
+
+    pub fn add_highlights(&mut self, highlights: VecDeque<Position>) {
+        self.highlights.extend(
+            highlights
+                .iter()
+                .cloned()
+                .map(|p| (p.x as i32, p.y as i32))
+        );
+    }
+}
+
 pub struct Maps {
     characters: EntityMap,
     items: EntityMap,
     tiles: TileMap,
-    highlights: Vec<(i32, i32)>,
-    highlight_color: Color,
 }
 
 impl Maps {
@@ -34,8 +118,6 @@ impl Maps {
             characters: EntityMap::new(),
             items: EntityMap::new(),
             tiles: TileMap::new(),
-            highlights: vec![],
-            highlight_color: colors::LIGHT_GREEN,
         }
     }
 
@@ -98,23 +180,6 @@ impl Maps {
             .collect::<Vec<Entity>>()
     }
 
-    pub fn clear_highlights(&mut self) {
-        self.highlights.clear();
-    }
-
-    pub fn set_highlight_color(&mut self, color: Color) {
-        self.highlight_color = color;
-    }
-
-    pub fn add_highlights(&mut self, highlights: VecDeque<Position>) {
-        self.highlights.extend(
-            highlights
-                .iter()
-                .cloned()
-                .map(|p| (p.x as i32, p.y as i32))
-        );
-    }
-
     pub fn is_blocking(&self, p: (i32, i32)) -> bool {
         self.tiles.is_blocking(p)
     }
@@ -143,14 +208,6 @@ impl Maps {
 
     pub fn draw(&self, tcod: &mut Tcod, viewport: &Viewport) {
         self.tiles.draw(tcod, viewport);
-
-        for pos in self.highlights.iter() {
-            let pixel = *pos;
-            if viewport.visible(pixel) {
-                let p = viewport.transform(pixel);
-                tcod.highlight(p, self.highlight_color);
-            }
-        }
     }
 
     pub fn clear_all(&mut self) {

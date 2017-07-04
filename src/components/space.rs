@@ -8,15 +8,20 @@ pub struct Position {
     pub y: f32,
 }
 
+#[derive(Copy, Clone, Debug, PartialEq, Eq, Hash)]
+pub enum Level {
+    Tower(i32),
+}
+
 #[derive(Copy, Clone, Debug, PartialEq)]
 pub struct Spawn {
     pub owner: Option<Entity>,
-    pub location: Option<(f32, f32)>,
+    pub location: Option<(f32, f32, Level)>,
 }
 
 impl Spawn {
-    pub fn for_location(x: f32, y: f32) -> Self {
-        Spawn { owner: None, location: Some((x, y)) }
+    pub fn for_location(x: f32, y: f32, level: Level) -> Self {
+        Spawn { owner: None, location: Some((x, y, level)) }
     }
 
     pub fn for_owner(owner: Entity) -> Self {
@@ -92,6 +97,10 @@ impl Component for Spawn {
 
 impl Component for Position {
     type Storage = VecStorage<Position>;
+}
+
+impl Component for Level {
+    type Storage = VecStorage<Level>;
 }
 
 pub struct Viewport {

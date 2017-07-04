@@ -5,7 +5,7 @@ use game_state::{ GameState };
 
 use geometry::{ Rect };
 
-use components::space::{ Position, Vector, Viewport, mul };
+use components::space::{ Position, Level, Vector, Viewport, mul };
 use components::player::{ Player, Equipment };
 use components::common::{ Active, InTurn, MoveToPosition, CharacterStats, ItemStats };
 use components::inventory::{ Inventory };
@@ -16,7 +16,7 @@ use engine::input_handler::{ InputHandler };
 use engine::time::{ Time };
 
 use event_log::{ EventLog, LogEvent };
-use maps::{ Map, Maps };
+use maps::{ Map, Tower };
 
 pub struct PlayerController;
 unsafe impl Sync for PlayerController {}
@@ -51,11 +51,12 @@ fn distance_cost(dist: usize, turn: &InTurn) -> Option<i32> {
 const PLAYER_SPEED: f32 = 4.0;
 impl System<()> for PlayerController {
     fn run(&mut self, arg: RunArg, _: ()) {
-        let (entities, players, actives, mut positions, mut interactables, mut interactions, mut inventories, mut move_to_positions, mut equipments, mut renderables,
-             mut char_stats, item_stats, items, mut in_turns, time, state, input, mut log, mut maps, viewport) = arg.fetch(|w| {
+        let (entities, players, actives, levels, mut positions, mut interactables, mut interactions, mut inventories, mut move_to_positions, mut equipments, mut renderables,
+             mut char_stats, item_stats, items, mut in_turns, time, state, input, mut log, mut tower, viewport) = arg.fetch(|w| {
                  (w.entities(),
                   w.read::<Player>(),
                   w.read::<Active>(),
+                  w.read::<Level>(),
                   w.write::<Position>(),
                   w.write::<Interactable>(),
                   w.write::<Interaction>(),
@@ -71,16 +72,17 @@ impl System<()> for PlayerController {
                   w.read_resource::<GameState>(),
                   w.read_resource::<InputHandler>(),
                   w.write_resource::<EventLog>(),
-                  w.write_resource::<Maps>(),
+                  w.write_resource::<Tower>(),
                   w.read_resource::<Viewport>())
         });
 
         let delta_time = time.delta_time.subsec_nanos() as f32 / 1.0e9;
 
         if state.is_turn_based {
-            if let Some ((id, p, _, _, turn, equipment)) = (&entities, &positions, &actives, &players, &mut in_turns, &equipments).iter().next() {
+            if let Some ((id, p, _, _, turn, equipment, level)) = (&entities, &positions, &actives, &players, &mut in_turns, &equipments, &levels).iter().next() {
                 if input.is_mouse_pressed() {
                     let pos_trans = viewport.inv_transform(input.mouse_pos);
+                    let maps = tower.get(level).unwrap();
                     if let Some(pos) = maps.screen_to_map(pos_trans) {
                         if viewport.visible(pos_trans) {
                             if !input.ctrl {
@@ -110,7 +112,8 @@ impl System<()> for PlayerController {
                 }
             }
         } else {
-            if let Some((id, p, _, _)) = (&entities, &positions, &players, &actives).iter().next() {
+            if let Some((id, p, level, _, _)) = (&entities, &positions, &levels, &players, &actives).iter().next() {
+                let maps = tower.get(level).unwrap();
                 if input.is_mouse_pressed() {
                     let pos_trans = viewport.inv_transform(input.mouse_pos);
                     if let Some(pos) = maps.screen_to_map(pos_trans) {
@@ -146,9 +149,10 @@ impl System<()> for PlayerController {
                 }
             }
         }
-        if let Some((id, inventory, equipment, _, _)) =
-            (&entities, &mut inventories, &mut equipments, &players, &actives).iter().next() {
+        if let Some((id, inventory, equipment, level, _, _)) =
+            (&entities, &mut inventories, &mut equipments, &levels, &players, &actives).iter().next() {
             let p = positions.get(id).unwrap().clone();
+            let maps = tower.get_mut(level).unwrap();
             // player interaction
             if input.is_char_pressed('p') {
                 if let Some(entry) = maps.pop(Map::Item, (p.x as i32, p.y as i32)) {
