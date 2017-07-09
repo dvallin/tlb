@@ -9,12 +9,13 @@ mod entity_map;
 mod ui;
 mod geometry;
 mod systems;
+mod tower;
 mod maps;
 mod game_stats;
 mod game_state;
 mod event_log;
 
-use specs::{ World, Join, Entity };
+use specs::{ World, Join };
 
 use engine::state::{ State, Transition };
 use engine::input_handler::{ InputHandler };
@@ -24,7 +25,8 @@ use engine::tcod::{ Tcod };
 use tcod::colors::{ self };
 use tcod::input::{ KeyCode };
 
-use maps::{ Tower, Map };
+use tower::{ Tower };
+use maps::{ Map };
 use game_stats::{ GameStats };
 use game_state::{ GameState };
 use event_log::{ EventLog };
@@ -33,11 +35,11 @@ use ui::{ Ui };
 use components::appearance::{ Renderable, Layer0, Layer1 };
 use components::space::{ Position, Spawn, Viewport, Level };
 use components::player::{ Player, Fov, Equipment };
-use components::npc::{ Npc, NpcInstance };
-use components::item::{ Item, ItemInstance };
+use components::npc::{ Npc };
+use components::item::{ Item };
 use components::common::{ Active, InTurn, WaitForTurn, CharacterStats,
                           MoveToPosition, ItemStats, Description };
-use components::interaction::{ Interactable, InteractableInstance, Interaction };
+use components::interaction::{ Interactable, Interaction };
 use components::inventory::{ Inventory };
 
 use geometry::{ Rect };
@@ -53,82 +55,6 @@ const TORCH_RADIUS: i32 = 10;
 struct Game;
 
 impl Game {
-    fn create_player(&mut self, x: f32, y: f32, tower: &Tower, active: bool, name: String,
-                     tcod: &mut Tcod, world: &mut World) {
-        let fov_map = tower.create_fov(tcod);
-        let mut builder = world.create_now()
-            .with(Player)
-            .with(Spawn::for_location(x, y, Level::Tower(0)))
-            .with(Renderable { character: '@', color: colors::WHITE })
-            .with(CharacterStats { health: 100.0, max_health: 100.0 } )
-            .with(Description { name: name, description: "".into() })
-            .with(Fov { fov_map: fov_map})
-            .with(Inventory::new())
-            .with(Equipment::new())
-            .with(Layer1);
-        if active {
-            builder = builder.with(Active);
-        }
-        builder.build();
-    }
-
-    fn create_npc(&mut self, x: f32, y: f32, level: Level,
-                  instance: NpcInstance, world: &mut World) -> Entity {
-        let n = Npc { instance: instance };
-        let builder = world.create_now()
-            .with(Spawn::for_location(x, y, level))
-            .with(components::npc::get_renderable(&n))
-            .with(components::npc::get_description(&n))
-            .with(components::npc::get_stats(&n))
-            .with(Inventory::new())
-            .with(n)
-            .with(Layer1);
-        builder.build()
-    }
-
-    fn create_interactable(&mut self, x: f32, y: f32, level: Level,
-                           instance: InteractableInstance, world: &mut World) -> Entity {
-        let interactable = Interactable::new(instance);
-        let builder = world.create_now()
-            .with(Spawn::for_location(x, y, level))
-            .with(interactable.get_renderable())
-            .with(interactable)
-            .with(Layer0);
-        builder.build()
-    }
-
-    fn create_inventory(&mut self, owner: Entity, items: Vec<ItemInstance>, world: &mut World) {
-        let mut inventory = Inventory::new();
-        for instance in items {
-            let i = Item { instance: instance };
-            let mut item = world.create_now()
-                .with(Spawn::for_owner(owner))
-                .with(components::item::get_renderable(&i))
-                .with(components::item::get_description(&i));
-            if let Some(c) = components::item::get_stats(&i) {
-                item = item.with(c)
-            }
-            item = item.with(i).with(Layer0);
-            inventory.items.push(item.build());
-        }
-        world.write().insert(owner, inventory);
-    }
-
-    fn create_item(&mut self, x: f32, y: f32, level: Level,
-                   instance: ItemInstance, world: &mut World) {
-        let i = Item { instance: instance };
-        let mut builder = world.create_now()
-            .with(Spawn::for_location(x, y, level))
-            .with(components::item::get_renderable(&i))
-            .with(components::item::get_description(&i));
-        if let Some(c) = components::item::get_stats(&i) {
-            builder = builder.with(c)
-        }
-        builder
-            .with(i)
-            .with(Layer0)
-            .build();
-    }
 
     fn reset_world(&mut self, tcod: &mut Tcod, world: &mut World) {
         let entities = world.entities();
@@ -221,30 +147,7 @@ impl State for Game {
         world.add_resource::<Viewport>(Viewport::new(15, 15, 80, 40));
 
         let mut tower = Tower::new(&[Level::Tower(0)]);
-        tower.build();
-
-        self.create_player(15.0, 15.0, &tower, true, "Colton".into(), tcod, world);
-        self.create_player(16.0, 16.0, &tower, false, "Gage".into(), tcod, world);
-
-        self.create_interactable(25.0, 21.0, Level::Tower(0),
-                                 InteractableInstance::KeyDoor(3, false), world);
-
-        {
-            let guard = self.create_npc(31.0, 24.0, Level::Tower(0),
-                                        NpcInstance::Guard, world);
-            self.create_inventory(guard, vec![ItemInstance::FlickKnife,
-                                              ItemInstance::Watch,
-                                              ItemInstance::KeyCard(3)], world);
-        }
-        self.create_npc(29.0, 24.0, Level::Tower(0), NpcInstance::Technician, world);
-        self.create_npc(31.0, 29.0, Level::Tower(0), NpcInstance::Accountant, world);
-
-        self.create_item(14.0, 15.0, Level::Tower(0), ItemInstance::FlickKnife, world);
-        self.create_item(13.0, 15.0, Level::Tower(0), ItemInstance::DartGun, world);
-        self.create_item(33.0, 25.0, Level::Tower(0), ItemInstance::Simstim, world);
-        self.create_item(23.0, 25.0, Level::Tower(0), ItemInstance::HitachiRam, world);
-        self.create_item(28.0, 21.0, Level::Tower(0), ItemInstance::Shuriken, world);
-
+        tower.build(tcod, world);
         world.add_resource::<Tower>(tower);
 
         let mut ui = Ui::new();

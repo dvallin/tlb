@@ -1,13 +1,12 @@
+use specs::{ Entity };
 use std::collections::VecDeque;
 use engine::tcod::{ Tcod };
 use tcod::pathfinding::{ AStar };
-use tcod::colors::{ self, Color };
 use tile_map::{ TileMap };
-use geometry::{ Shape, Ray };
-use std::collections::{ HashMap };
-use components::space::{ Viewport, Position, Level };
+use geometry::{ Shape, Ray, Line, Rect };
 use entity_map::{ EntityMap, Entry };
-use specs::{ Entity };
+
+use components::space::{ Viewport, Position };
 
 const SCREEN_WIDTH: i32 = 80;
 const SCREEN_HEIGHT: i32 = 50;
@@ -19,91 +18,6 @@ const MAP_Y: i32 = SCREEN_HEIGHT - MAP_HEIGHT;
 pub enum Map {
     Item,
     Character,
-}
-
-pub struct Tower {
-    maps: HashMap<Level, Maps>,
-    highlights: Vec<(i32, i32)>,
-    highlight_color: Color,
-}
-
-impl Tower {
-    pub fn new(levels: &[Level]) -> Self {
-        let mut maps = HashMap::new();
-        for level in levels {
-            maps.insert(*level, Maps::new());
-        }
-        Tower {
-            maps: maps,
-            highlights: vec![],
-            highlight_color: colors::LIGHT_GREEN,
-        }
-    }
-
-    pub fn build(&mut self) {
-        for (level, maps) in &mut self.maps {
-            maps.build();
-        }
-    }
-
-    pub fn clear(&mut self) {
-        for (level, maps) in &mut self.maps {
-            maps.clear_all();
-        }
-    }
-
-    pub fn get_mut(&mut self, level: &Level) -> Option<&mut Maps> {
-        self.maps.get_mut(level)
-    }
-
-    pub fn get(&self, level: &Level) -> Option<&Maps> {
-        self.maps.get(level)
-    }
-
-    pub fn update(&mut self, tcod: &mut Tcod) {
-        for (level, maps) in &mut self.maps {
-            maps.update(tcod);
-        }
-    }
-
-    pub fn draw(&self, level: &Level, tcod: &mut Tcod, viewport: &Viewport) {
-        if let Some(map) = self.maps.get(level) {
-            map.draw(tcod, viewport);
-        }
-
-        for pos in self.highlights.iter() {
-            let pixel = *pos;
-            if viewport.visible(pixel) {
-                let p = viewport.transform(pixel);
-                tcod.highlight(p, self.highlight_color);
-            }
-        }
-    }
-
-    pub fn create_fov(&self, tcod: &mut Tcod) -> HashMap<Level, usize> {
-        let mut result = HashMap::new();
-        for (level, maps) in &self.maps {
-            result.insert(*level, tcod.create_fov());
-        }
-        result
-    }
-
-    pub fn clear_highlights(&mut self) {
-        self.highlights.clear();
-    }
-
-    pub fn set_highlight_color(&mut self, color: Color) {
-        self.highlight_color = color;
-    }
-
-    pub fn add_highlights(&mut self, highlights: VecDeque<Position>) {
-        self.highlights.extend(
-            highlights
-                .iter()
-                .cloned()
-                .map(|p| (p.x as i32, p.y as i32))
-        );
-    }
 }
 
 pub struct Maps {
@@ -132,7 +46,7 @@ impl Maps {
 
     pub fn find_path(&self, entity: &Entity,
                      from: (i32, i32), to: (i32, i32)) -> VecDeque<Position> {
-        let callback = |start: (i32,i32), end:(i32,i32) | if
+        let callback = |_start: (i32,i32), end:(i32,i32) | if
             self.is_not_planable(entity, end) { 0.0 } else { 1.0 };
         let mut astar = AStar::new_from_callback(MAP_WIDTH, MAP_HEIGHT, callback, 0.0);
         astar.find(from, to);
@@ -199,7 +113,15 @@ impl Maps {
     }
 
     pub fn build(&mut self) {
-        self.tiles.build();
+        self.tiles.create_room(&Rect::new(20, 20, 15, 15));
+        self.tiles.create_anti_room(&Rect::new(25, 25, 5, 5));
+        self.tiles.draw_line(&Line::new(25, 22, 25, 27));
+
+        self.tiles.create_room(&Rect::new(10, 25, 5, 5));
+        self.tiles.create_room(&Rect::new(10, 12, 8, 8));
+
+        self.tiles.create_corridor(&Rect::new(10, 18, 3, 9));
+        self.tiles.create_corridor(&Rect::new(13, 27, 9, 3));
     }
 
     pub fn update(&mut self, tcod: &mut Tcod) {

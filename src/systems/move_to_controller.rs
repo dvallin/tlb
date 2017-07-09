@@ -4,7 +4,8 @@ use components::space::{ Position, Level, mul, Viewport };
 use components::common::{ Active, MoveToPosition };
 use engine::time::{ Time };
 
-use maps::{ Map, Tower };
+use tower::{ Tower };
+use maps::{ Map };
 
 pub struct MoveToController;
 unsafe impl Sync for MoveToController {}

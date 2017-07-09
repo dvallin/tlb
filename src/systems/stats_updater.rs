@@ -5,7 +5,8 @@ use components::inventory::{ Inventory };
 use components::space::{ Position, Level };
 
 use event_log::{ EventLog, LogEvent };
-use maps::{ Map, Tower };
+use tower::{ Tower };
+use maps::{ Map };
 
 pub struct StatsUpdater;
 unsafe impl Sync for StatsUpdater {}

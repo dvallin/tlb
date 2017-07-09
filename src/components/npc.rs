@@ -18,24 +18,26 @@ impl Component for Npc {
     type Storage = HashMapStorage<Npc>;
 }
 
-pub fn get_renderable(npc: &Npc) -> Renderable {
-    use self::NpcInstance::*;
-    match npc.instance {
-        Guard => Renderable { character: 'G', color: colors::ORANGE },
-        Accountant => Renderable { character: 'a', color: colors::GREY },
-        Technician => Renderable { character: 'T', color: colors::YELLOW },
+impl Npc {
+    pub fn get_renderable(&self) -> Renderable {
+        use self::NpcInstance::*;
+        match self.instance {
+            Guard => Renderable { character: 'G', color: colors::ORANGE },
+            Accountant => Renderable { character: 'a', color: colors::GREY },
+            Technician => Renderable { character: 'T', color: colors::YELLOW },
+        }
     }
-}
 
-pub fn get_description(npc: &Npc) -> Description {
-    use self::NpcInstance::*;
-    match npc.instance {
-        Guard => Description::new("Walker", "Guard"),
-        Accountant => Description::new("Phil", "Accountant"),
-        Technician => Description::new("Spike", "Technician"),
+    pub fn get_description(&self) -> Description {
+        use self::NpcInstance::*;
+        match self.instance {
+            Guard => Description::new("Walker", "Guard"),
+            Accountant => Description::new("Phil", "Accountant"),
+            Technician => Description::new("Spike", "Technician"),
+        }
     }
-}
 
-pub fn get_stats(_npc: &Npc) -> CharacterStats {
-    CharacterStats { health: 100.0, max_health: 100.0 }
+    pub fn get_stats(&self) -> CharacterStats {
+        CharacterStats { health: 100.0, max_health: 100.0 }
+    }
 }

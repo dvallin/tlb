@@ -16,7 +16,8 @@ use engine::input_handler::{ InputHandler };
 use engine::time::{ Time };
 
 use event_log::{ EventLog, LogEvent };
-use maps::{ Map, Tower };
+use tower::{ Tower };
+use maps::{ Map };
 
 pub struct PlayerController;
 unsafe impl Sync for PlayerController {}

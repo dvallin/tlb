@@ -1,4 +1,3 @@
-use components::player::{ Equipment };
 use components::appearance::{ Renderable };
 use components::item::{ Item, ItemInstance };
 use specs::{ Component, HashMapStorage, Entity };
@@ -27,24 +26,22 @@ impl Interactable {
         Interactable { state: instance, initial_state: instance }
     }
 
-    fn key_door_new_state(min_level: i32, open: bool, tool: &Option<&Item>) -> bool {
-        if let Some(item) = *tool {
-            match item.instance {
-                ItemInstance::KeyCard(level) => {
-                    if open {
-                        false
-                    } else {
-                        level >= min_level
-                    }
-                }
-                _ => false
-            }
-        } else {
+    fn key_door_new_state(min_level: i32, open: bool, tool: Option<&Item>) -> bool {
+        if open {
             false
+        } else {
+            if let Some(item) = tool {
+                match item.instance {
+                    ItemInstance::KeyCard(level) => level >= min_level,
+                    _ => min_level == 0
+                }
+            } else {
+               min_level == 0
+            }
         }
     }
 
-    pub fn interact_with(&mut self, active: &Option<&Item>, passive: &Option<&Item>, clothing: &Option<&Item>) {
+    pub fn interact_with(&mut self, active: Option<&Item>, passive: Option<&Item>, clothing: Option<&Item>) {
         use self::InteractableInstance::*;
         self.state = match self.state {
             KeyDoor(min_level, open) => {

@@ -10,7 +10,7 @@ use components::inventory::{ Inventory };
 use engine::input_handler::{ InputHandler };
 use components::common::{ Active, InTurn, InTurnState, Description, CharacterStats, ItemStats };
 
-use maps::{ Tower };
+use tower::{ Tower };
 
 pub struct UiUpdater;
 unsafe impl Sync for UiUpdater {}

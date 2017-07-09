@@ -7,7 +7,8 @@ use components::appearance::{ Renderable };
 use components::space::{ Position, Level };
 
 use game_state::{ GameState };
-use maps::{ Map, Tower };
+use tower::{ Tower };
+use maps::{ Map };
 
 pub struct InteractionSystem;
 unsafe impl Sync for InteractionSystem {}
@@ -34,7 +35,7 @@ impl System<()> for InteractionSystem {
                 let passive_item = equipment.passive_item.and_then(|i| items.get(i));
                 let clothing = equipment.clothing.and_then(|i| items.get(i));
                 let was_sight_blocking = interactable.is_sight_blocking();
-                interactable.interact_with(&active_item, &passive_item, &clothing);
+                interactable.interact_with(active_item, passive_item, clothing);
                 renderables.insert(id, interactable.get_renderable());
                 if let Some(level) = levels.get(id) {
                     let maps = tower.get_mut(level).unwrap();
