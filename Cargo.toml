@@ -5,6 +5,7 @@ authors = ["max <schuler.maximilian@gmail.com>"]
 
 [dependencies]
 rand = "0.3"
+base64 = "0.6.0"
 tcod = "0.11"
 shred = "0.4.3"
 shred-derive = "0.3"

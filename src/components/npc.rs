@@ -1,4 +1,6 @@
 use tcod::colors::{ self };
+use rand::{ Rng };
+use base64::{ encode };
 use specs::{ Component, HashMapStorage };
 use components::common::{ CharacterStats, Description };
 use components::inventory::{ Inventory };
@@ -10,6 +12,7 @@ pub struct Npc {
 
 pub enum NpcInstance {
     Guard,
+    Grunt,
     Accountant,
     Technician
 }
@@ -28,12 +31,19 @@ impl Npc {
         }
     }
 
-    pub fn get_description(&self) -> Description {
+    pub fn name<R: Rng>(rng: &mut R) -> &str {
+        let names = ["Chopra", "Nagata", "Deep-Ando", "Walker", "Spike", "Rex", "Troy", "Del", "Dash", "Proto", "Ogura"];
+        names[(rng.next_u32() % 11) as usize]
+    }
+
+    pub fn get_description<R: Rng>(&self, rng: &mut R) -> Description {
         use self::NpcInstance::*;
+        let name = Npc::name(rng);
         match self.instance {
-            Guard => Description::new("Walker", "Guard"),
-            Accountant => Description::new("Phil", "Accountant"),
-            Technician => Description::new("Spike", "Technician"),
+            Guard => Description::new(name, "Guard"),
+            Grunt => Description::new(encode(name).as_str(), "Grunt"), // they are not just numbers ;)
+            Accountant => Description::new(name, "Accountant"),
+            Technician => Description::new(name, "Technician"),
         }
     }
 

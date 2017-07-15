@@ -1,4 +1,5 @@
 extern crate rand;
+extern crate base64;
 extern crate tcod;
 extern crate specs;
 extern crate rayon;

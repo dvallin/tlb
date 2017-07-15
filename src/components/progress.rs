@@ -17,6 +17,7 @@ pub struct Milestone {
     pub post: Vec<Event>,
 }
 
+
 pub struct Area {
     pub min_level: Level,
     pub max_level: Level,
@@ -132,6 +133,15 @@ impl Milestone {
         }
     }
 
+    pub fn areas(&self) -> Vec<AreaInstance> {
+        use self::Event::*;
+        self.pre.iter()
+            .filter_map(|e| match *e {
+                HasAccess(a) => Some(a),
+                _ => None,
+            })
+            .collect()
+    }
 
     fn create_instance_pool() -> HashMap<MilestoneInstance, Milestone> {
         MilestoneInstance::values()
