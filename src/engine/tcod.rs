@@ -4,8 +4,6 @@ use tcod::chars::{ self };
 use tcod::map::{Map as FovMap, FovAlgorithm};
 use tcod::colors::{ Color };
 
-use specs::{ World };
-
 use maps::{ Maps };
 use geometry::{ Rect };
 

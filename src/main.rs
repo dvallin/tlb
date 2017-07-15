@@ -1,6 +1,9 @@
 extern crate tcod;
 extern crate specs;
-extern crate num_cpus;
+extern crate rayon;
+extern crate shred;
+#[macro_use]
+extern crate shred_derive;
 
 mod engine;
 mod components;
@@ -15,11 +18,11 @@ mod game_stats;
 mod game_state;
 mod event_log;
 
-use specs::{ World, Join };
+use specs::{ World, Join, DispatcherBuilder };
 
 use engine::state::{ State, Transition };
 use engine::input_handler::{ InputHandler };
-use engine::application::{ ApplicationBuilder };
+use engine::application::{ Application };
 use engine::tcod::{ Tcod };
 
 use tcod::colors::{ self };
@@ -83,7 +86,7 @@ impl Game {
         moves.clear();
 
         tower.clear();
-        for (id, spawn) in (&entities, &spawns).iter() {
+        for (id, spawn) in (&*entities, &spawns).join() {
             if let Some(loc) = spawn.location {
                 positions.insert(id, Position { x: loc.0, y: loc.1 });
                 levels.insert(id, loc.2);
@@ -96,11 +99,11 @@ impl Game {
                 }
             }
         }
-        for (_, interactable) in (&entities, &mut interactables).iter() {
+        for (_, interactable) in (&*entities, &mut interactables).join() {
             interactable.reset();
         }
 
-        for (id, interactable, pos, level) in (&entities, &mut interactables, &mut positions, &mut levels).iter() {
+        for (id, interactable, pos, level) in (&*entities, &mut interactables, &mut positions, &mut levels).join() {
             let p = (pos.x as i32, pos.y as i32);
             if let Some(maps) = tower.get_mut(level) {
                 maps.push(Map::Character, &id, p);
@@ -109,18 +112,18 @@ impl Game {
             }
         }
 
-        for (id, _, pos, level) in (&entities, &players, &mut positions, &mut levels).iter() {
+        for (id, _, pos, level) in (&*entities, &players, &mut positions, &mut levels).join() {
             if let Some(maps) = tower.get_mut(level) {
                 maps.push(Map::Character, &id, (pos.x as i32, pos.y as i32));
             }
         }
-        for (id, _, pos, stats, level) in (&entities, &npcs, &mut positions, &mut char_stats, &mut levels).iter() {
+        for (id, _, pos, stats, level) in (&*entities, &npcs, &mut positions, &mut char_stats, &mut levels).join() {
             if let Some(maps) = tower.get_mut(level) {
                 maps.push(Map::Character, &id, (pos.x as i32, pos.y as i32));
             }
             stats.reset();
         }
-        for (id, _, pos, level) in (&entities, &items, &mut positions, &mut levels).iter() {
+        for (id, _, pos, level) in (&*entities, &items, &mut positions, &mut levels).join() {
             if let Some(maps) = tower.get_mut(level) {
                 maps.push(Map::Item, &id, (pos.x as i32, pos.y as i32));
             }
@@ -190,12 +193,12 @@ impl State for Game {
 
         if state.fov_needs_update {
             let tower = world.read_resource::<Tower>();
-            for (fov, level) in (&fovs, &levels).iter() {
+            for (fov, level) in (&fovs, &levels).join() {
                 tcod.update_fov(*fov.fov_map.get(level).unwrap(),
                                 tower.get(level).unwrap());
             }
         }
-        for (fov, position, level) in (&fovs, &positions, &levels).iter() {
+        for (fov, position, level) in (&fovs, &positions, &levels).join() {
             tcod.compute_fov(*fov.fov_map.get(level).unwrap(),
                              (position.x as i32, position.y as i32), TORCH_RADIUS);
         }
@@ -220,15 +223,15 @@ impl State for Game {
         tcod.clear(colors::BLACK);
 
         {
-            if let Some((level, _)) = (&levels, &actives).iter().next() {
+            if let Some((level, _)) = (&levels, &actives).join().next() {
                 tower.draw(level, tcod, &viewport);
             }
             ui.draw(tcod);
 
-            for (_, renderable, position) in (&layer0, &renderables, &positions).iter() {
+            for (_, renderable, position) in (&layer0, &renderables, &positions).join() {
                 render_into_viewport(&viewport, position, renderable, tcod);
             }
-            for (_, renderable, position) in (&layer1, &renderables, &positions).iter() {
+            for (_, renderable, position) in (&layer1, &renderables, &positions).join() {
                render_into_viewport(&viewport, position, renderable, tcod);
             }
         }
@@ -238,31 +241,31 @@ impl State for Game {
 }
 
 fn main() {
-    ApplicationBuilder::new(Game)
-        .register::<Player>()
-        .register::<Level>()
-        .register::<Npc>()
-        .register::<Spawn>()
-        .register::<Item>()
-        .register::<Fov>()
-        .register::<Description>()
-        .register::<Active>()
-        .register::<InTurn>()
-        .register::<Interactable>()
-        .register::<Interaction>()
-        .register::<WaitForTurn>()
-        .register::<Inventory>()
-        .register::<Equipment>()
-        .register::<CharacterStats>()
-        .register::<ItemStats>()
-        .register::<MoveToPosition>()
-        .with::<PlayerController>(PlayerController, "player_controller_system", 1)
-        .with::<MoveToController>(MoveToController, "move_to_controller_system", 1)
-        .with::<InteractionSystem>(InteractionSystem, "interaction_system", 1)
-        .with::<RoundScheduler>(RoundScheduler, "round_scheduler_system", 2)
-        .with::<StatsUpdater>(StatsUpdater, "stats_updater_system", 2)
-        .with::<UiUpdater>(UiUpdater, "ui_updater_system", 2)
-        .build()
-        .run();
+    let mut world = World::new();
+    world.register::<Player>();
+    world.register::<Level>();
+    world.register::<Npc>();
+    world.register::<Spawn>();
+    world.register::<Item>();
+    world.register::<Fov>();
+    world.register::<Description>();
+    world.register::<Active>();
+    world.register::<InTurn>();
+    world.register::<Interactable>();
+    world.register::<Interaction>();
+    world.register::<WaitForTurn>();
+    world.register::<Inventory>();
+    world.register::<Equipment>();
+    world.register::<CharacterStats>();
+    world.register::<ItemStats>();
+    world.register::<MoveToPosition>();
 
+    let dispatcher = DispatcherBuilder::new()
+        .add(PlayerController, "player_controller_system", &[])
+        .add(MoveToController, "move_to_controller", &[])
+        .add(InteractionSystem, "interaction_system", &[])
+        .add(RoundScheduler, "round_scheduler", &[])
+        .add(StatsUpdater, "stats_updater", &[])
+        .add(UiUpdater, "ui_updater", &[]);
+    Application::new(Game, world, dispatcher.build()).run();
 }

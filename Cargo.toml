@@ -5,5 +5,7 @@ authors = ["max <schuler.maximilian@gmail.com>"]
 
 [dependencies]
 tcod = "0.11"
-num_cpus = "1.2"
-specs = "0.7"
+shred = "0.4.3"
+shred-derive = "0.3"
+rayon = "0.7.1"
+specs = "0.9"

@@ -1,4 +1,4 @@
-use specs::{ System, RunArg, Join };
+use specs::{ System, ReadStorage, Fetch, FetchMut, Entities, WriteStorage, Join };
 
 use tcod::input::{ KeyCode };
 use game_state::{ GameState };
@@ -11,49 +11,51 @@ use engine::input_handler::{ InputHandler };
 pub struct RoundScheduler;
 unsafe impl Sync for RoundScheduler {}
 
-impl System<()> for RoundScheduler {
-    fn run(&mut self, arg: RunArg, _: ()) {
-        let (entities, players, mut actives, mut in_turns, mut waits,
-             move_to_positions, mut log, mut state, input) = arg.fetch(|w| {
-                 (w.entities(),
-                  w.read::<Player>(),
-                  w.write::<Active>(),
-                  w.write::<InTurn>(),
-                  w.write::<WaitForTurn>(),
-                  w.read::<MoveToPosition>(),
-                  w.write_resource::<EventLog>(),
-                  w.write_resource::<GameState>(),
-                  w.read_resource::<InputHandler>())
-        });
+#[derive(SystemData)]
+pub struct RoundSchedulerData<'a> {
+    entities: Entities<'a>,
+    players: ReadStorage<'a, Player>,
+    actives: WriteStorage<'a, Active>,
+    in_turns: WriteStorage<'a, InTurn>,
+    waits: WriteStorage<'a, WaitForTurn>,
+    move_to_positions: ReadStorage<'a, MoveToPosition>,
+    log: FetchMut<'a, EventLog>,
+    state: FetchMut<'a, GameState>,
+    input: Fetch<'a, InputHandler>,
+}
 
-        if input.is_key_pressed(KeyCode::Spacebar) {
-            state.is_turn_based = !state.is_turn_based;
+impl<'a> System<'a> for RoundScheduler {
+    type SystemData = RoundSchedulerData<'a>;
 
-            if state.is_turn_based {
-                for (id, _) in (&entities, &players).iter() {
-                    waits.insert(id, WaitForTurn);
+    fn run(&mut self, mut data: RoundSchedulerData) {
+        if data.input.is_key_pressed(KeyCode::Spacebar) {
+            data.state.is_turn_based = !data.state.is_turn_based;
+
+            if data.state.is_turn_based {
+                for (id, _) in (&*data.entities, &data.players).join() {
+                    data.waits.insert(id, WaitForTurn);
                 }
             } else {
-                waits.clear();
-                in_turns.clear();
+                data.waits.clear();
+                data.in_turns.clear();
             }
         }
 
-        if state.is_turn_based {
+        if data.state.is_turn_based {
             let mut active_became_waiting = false;
             let mut took_turns = vec![];
-            if input.is_key_pressed(KeyCode::Enter) {
-                if let Some((id, _, _, _)) = (&entities, &in_turns,
-                                              &actives, &players) .iter().next() {
+            if data.input.is_key_pressed(KeyCode::Enter) {
+                if let Some((id, _, _, _)) = (&*data.entities, &data.in_turns,
+                                              &data.actives, &data.players).join().next() {
                     active_became_waiting = true;
                     took_turns.push(id);
                 }
             }
 
-            for (id, in_turn) in (&entities, &mut in_turns).iter() {
+            for (id, in_turn) in (&*data.entities, &mut data.in_turns).join() {
                 match in_turn.state {
                     InTurnState::Walking => {
-                        if move_to_positions.get(id).is_none() {
+                        if data.move_to_positions.get(id).is_none() {
                             in_turn.action_done();
                         }
                     },
@@ -61,7 +63,7 @@ impl System<()> for RoundScheduler {
                 }
                 if in_turn.is_done() {
                     took_turns.push(id);
-                    if actives.get(id).is_some() {
+                    if data.actives.get(id).is_some() {
                         active_became_waiting = true;
                     }
                 }
@@ -69,47 +71,47 @@ impl System<()> for RoundScheduler {
 
             // switch the took turns to wait for turn
             for id in took_turns {
-                log.log(LogEvent::FinishedTurn(id));
-                waits.insert(id, WaitForTurn);
-                in_turns.remove(id);
+                data.log.log(LogEvent::FinishedTurn(id));
+                data.waits.insert(id, WaitForTurn);
+                data.in_turns.remove(id);
             }
 
             // if no one is in turn, put all in turn
-            if in_turns.iter().next().is_none() {
-                for (id, _) in (&entities, &waits).iter() {
-                    in_turns.insert(id, InTurn::default());
+            if data.in_turns.join().next().is_none() {
+                for (id, _) in (&*data.entities, &data.waits).join() {
+                    data.in_turns.insert(id, InTurn::default());
                 }
-                waits.clear();
+                data.waits.clear();
             }
 
             // if active became waiting, activate first in turn
             if active_became_waiting {
-                if let Some ((id, _)) = (&entities, &in_turns).iter().next() {
-                    if players.get(id).is_some() {
-                        actives.clear();
-                        actives.insert(id, Active);
+                if let Some ((id, _)) = (&*data.entities, &data.in_turns).join().next() {
+                    if data.players.get(id).is_some() {
+                        data.actives.clear();
+                        data.actives.insert(id, Active);
                     }
                 }
             }
         }
 
-        if input.is_key_pressed(KeyCode::Tab) {
+        if data.input.is_key_pressed(KeyCode::Tab) {
             // rotate players
             let mut take_first = true;
             let mut active_player_seen = false;
-            for (id, _) in (&entities, &players).iter() {
+            for (id, _) in (&*data.entities, &data.players).join() {
                 if active_player_seen {
-                    actives.insert(id, Active);
+                    data.actives.insert(id, Active);
                     take_first = false;
                     break;
                 }
-                if actives.remove(id).is_some() {
+                if data.actives.remove(id).is_some() {
                     active_player_seen = true;
                 }
             }
             if take_first {
-                if let Some ((id, _)) = (&entities, &players).iter().next() {
-                    actives.insert(id, Active);
+                if let Some ((id, _)) = (&*data.entities, &data.players).join().next() {
+                    data.actives.insert(id, Active);
                 }
             }
         }

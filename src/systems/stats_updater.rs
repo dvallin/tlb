@@ -1,4 +1,4 @@
-use specs::{ System, RunArg, Join };
+use specs::{ System, ReadStorage, FetchMut, Entities, WriteStorage, Join };
 
 use components::common::{ CharacterStats };
 use components::inventory::{ Inventory };
@@ -11,40 +11,43 @@ use maps::{ Map };
 pub struct StatsUpdater;
 unsafe impl Sync for StatsUpdater {}
 
-impl System<()> for StatsUpdater {
-    fn run(&mut self, arg: RunArg, _: ()) {
-        let (entities, mut char_stats, mut positions, levels, mut inventories, mut log, mut tower) = arg.fetch(|w| {
-            (w.entities(),
-             w.write::<CharacterStats>(),
-             w.write::<Position>(),
-             w.read::<Level>(),
-             w.write::<Inventory>(),
-             w.write_resource::<EventLog>(),
-             w.write_resource::<Tower>())
-        });
+#[derive(SystemData)]
+pub struct StatsUpdaterData<'a> {
+    entities: Entities<'a>,
+    char_stats: WriteStorage<'a, CharacterStats>,
+    positions: WriteStorage<'a, Position>,
+    levels: ReadStorage<'a, Level>,
+    inventories: WriteStorage<'a, Inventory>,
+    log: FetchMut<'a, EventLog>,
+    tower: FetchMut<'a, Tower>,
+}
 
+impl<'a> System<'a> for StatsUpdater {
+    type SystemData = StatsUpdaterData<'a>;
+
+    fn run(&mut self, mut data: StatsUpdaterData) {
         let mut graveyard = vec![];
-        for (id, stats, pos, level) in (&entities, &char_stats, &positions, &levels).iter() {
+        for (id, stats, pos, level) in (&*data.entities, &data.char_stats, &data.positions, &data.levels).join() {
             if stats.health <= 0.0 {
                 graveyard.push((id, *pos, level));
-                log.log(LogEvent::Died(id));
+                data.log.log(LogEvent::Died(id));
             }
         }
 
         for (id, pos, level) in graveyard {
             let p = (pos.x as i32, pos.y as i32);
-            let maps = tower.get_mut(level).unwrap();
+            let maps = data.tower.get_mut(level).unwrap();
             maps.remove(Map::Character, &id, p);
-            if let Some(inventory) = inventories.get_mut(id) {
+            if let Some(inventory) = data.inventories.get_mut(id) {
                 for item in inventory.items.iter() {
                     maps.push(Map::Item, item, p);
-                    positions.insert(*item, pos);
+                    data.positions.insert(*item, pos);
                 }
                 inventory.items.clear();
             }
 
-            char_stats.remove(id);
-            positions.remove(id);
+            data.char_stats.remove(id);
+            data.positions.remove(id);
         }
     }
 }

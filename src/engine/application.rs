@@ -1,8 +1,6 @@
-use num_cpus;
-
 use std::time::{ Duration, Instant };
 
-use specs::{ World, Planner, Component, Priority, System };
+use specs::{ World, Dispatcher };
 
 use engine::state::{ StateMachine, State };
 use engine::tcod::{ Tcod };
@@ -11,8 +9,9 @@ use engine::time::{ Time, Stopwatch };
 use components::appearance::{ Renderable, Layer0, Layer1 };
 use components::space::{ Position };
 
-pub struct Application {
-    planner: Planner<()>,
+pub struct Application<'a, 'b> {
+    dispatcher: Dispatcher<'a, 'b>,
+    world: World,
     state: StateMachine,
     tcod: Tcod,
 
@@ -22,13 +21,10 @@ pub struct Application {
     last_fixed_update: Instant,
 }
 
-impl Application {
-    pub fn new<T>(initial_state: T, mut planner: Planner<()>) -> Self
+impl<'a, 'b> Application<'a, 'b> {
+    pub fn new<T>(initial_state: T, mut world: World, dispatcher: Dispatcher<'a, 'b>) -> Self
         where T: State + 'static {
-
         {
-            let mut world = planner.mut_world();
-
             let time = Time {
                 delta_time: Duration::new(0, 0),
                 fixed_step: Duration::new(0, 16666666),
@@ -45,7 +41,8 @@ impl Application {
         }
 
         Application {
-            planner: planner,
+            dispatcher: dispatcher,
+            world: world,
             state: StateMachine::new(initial_state),
             tcod: Tcod::new(),
             timer: Stopwatch::default(),
@@ -67,71 +64,31 @@ impl Application {
 
     fn step(&mut self) {
         { // prepare world update
-            let world = self.planner.mut_world();
             {
-                let mut time = world.write_resource::<Time>();
+                let mut time = self.world.write_resource::<Time>();
                 time.delta_time = self.delta_time;
                 time.last_fixed_update = self.last_fixed_update;
                 time.fixed_step = self.fixed_step;
             }
 
-            self.state.handle_events(&mut self.tcod, world);
+            self.state.handle_events(&mut self.tcod, &mut self.world);
             if self.last_fixed_update.elapsed() >= self.fixed_step {
-                self.state.fixed_update(&mut self.tcod, world);
+                self.state.fixed_update(&mut self.tcod, &mut self.world);
                 self.last_fixed_update += self.fixed_step;
             }
-            self.state.update(&mut self.tcod, world);
+            self.state.update(&mut self.tcod, &mut self.world);
         }
 
         // execute world update
-        self.planner.dispatch(());
-        self.planner.wait();
+        self.dispatcher.dispatch(&mut self.world.res);
+        self.world.maintain();
 
         { // render world
-            let world = &mut self.planner.mut_world();
-            self.state.render(&mut self.tcod, world);
+            self.state.render(&mut self.tcod, &mut self.world);
         }
     }
 
     fn initialize(&mut self) {
-        let world = self.planner.mut_world();
-        self.state.start(&mut self.tcod, world);
-    }
-}
-pub struct ApplicationBuilder<T> where T: State + 'static {
-    initial_state: T,
-    planner: Planner<()>,
-}
-
-impl<T> ApplicationBuilder<T> where T: State + 'static {
-    /// Creates a new ApplicationBuilder with the given initial game state and
-    /// display configuration.
-    pub fn new(initial_state: T) -> ApplicationBuilder<T> {
-        ApplicationBuilder {
-            initial_state: initial_state,
-            planner: Planner::new(World::new(), num_cpus::get()),
-        }
-    }
-
-    /// Registers a given component type.
-    pub fn register<C>(mut self) -> ApplicationBuilder<T> where C: Component {
-        {
-            let world = &mut self.planner.mut_world();
-            world.register::<C>();
-        }
-        self
-    }
-
-    /// Adds a given system `pro`, assigns it the string identifier `name`,
-    /// and marks it with the runtime priority `pri`.
-    pub fn with<S>(mut self, sys: S, name: &str, pri: Priority) -> ApplicationBuilder<T>
-        where S: System<()> + 'static {
-        self.planner.add_system::<S>(sys, name, pri);
-        self
-    }
-
-    /// Builds the Application and returns the result.
-    pub fn build(self) -> Application {
-        Application::new(self.initial_state, self.planner)
+        self.state.start(&mut self.tcod, &mut self.world);
     }
 }

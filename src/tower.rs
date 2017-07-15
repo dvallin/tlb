@@ -37,7 +37,7 @@ impl Tower {
     fn create_player(&mut self, x: f32, y: f32, active: bool, name: String,
                      tcod: &mut Tcod, world: &mut World) {
         let fov_map = self.create_fov(tcod);
-        let mut builder = world.create_now()
+        let mut builder = world.create_entity()
             .with(Player)
             .with(Spawn::for_location(x, y, Level::Tower(0)))
             .with(Renderable { character: '@', color: colors::WHITE })
@@ -56,7 +56,7 @@ impl Tower {
     fn create_npc(&mut self, x: f32, y: f32, level: Level,
                   instance: NpcInstance, world: &mut World) -> Entity {
         let n = Npc { instance: instance };
-        let builder = world.create_now()
+        let builder = world.create_entity()
             .with(Spawn::for_location(x, y, level))
             .with(n.get_renderable())
             .with(n.get_description())
@@ -70,7 +70,7 @@ impl Tower {
     fn create_interactable(&mut self, x: f32, y: f32, level: Level,
                            instance: InteractableInstance, world: &mut World) -> Entity {
         let interactable = Interactable::new(instance);
-        let builder = world.create_now()
+        let builder = world.create_entity()
             .with(Spawn::for_location(x, y, level))
             .with(interactable.get_renderable())
             .with(interactable)
@@ -82,7 +82,7 @@ impl Tower {
         let mut inventory = Inventory::new();
         for instance in items {
             let i = Item { instance: instance };
-            let mut item = world.create_now()
+            let mut item = world.create_entity()
                 .with(Spawn::for_owner(owner))
                 .with(i.get_renderable())
                 .with(i.get_description());
@@ -98,7 +98,7 @@ impl Tower {
     fn create_item(&mut self, x: f32, y: f32, level: Level,
                    instance: ItemInstance, world: &mut World) {
         let i = Item { instance: instance };
-        let mut builder = world.create_now()
+        let mut builder = world.create_entity()
             .with(Spawn::for_location(x, y, level))
             .with(i.get_renderable())
             .with(i.get_description());
@@ -141,7 +141,7 @@ impl Tower {
     }
 
     pub fn clear(&mut self) {
-        for (level, maps) in &mut self.maps {
+        for (_, maps) in &mut self.maps {
             maps.clear_all();
         }
     }
@@ -155,7 +155,7 @@ impl Tower {
     }
 
     pub fn update(&mut self, tcod: &mut Tcod) {
-        for (level, maps) in &mut self.maps {
+        for (_, maps) in &mut self.maps {
             maps.update(tcod);
         }
     }
@@ -176,7 +176,7 @@ impl Tower {
 
     pub fn create_fov(&self, tcod: &mut Tcod) -> HashMap<Level, usize> {
         let mut result = HashMap::new();
-        for (level, maps) in &self.maps {
+        for (level, _) in &self.maps {
             result.insert(*level, tcod.create_fov());
         }
         result
