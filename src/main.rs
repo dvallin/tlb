@@ -1,3 +1,4 @@
+extern crate rand;
 extern crate tcod;
 extern crate specs;
 extern crate rayon;

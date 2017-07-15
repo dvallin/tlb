@@ -1,23 +1,24 @@
 use std::collections::VecDeque;
-use specs::{ System, ReadStorage, Fetch, FetchMut, Entities, WriteStorage, Join };
+use specs::{System, ReadStorage, Fetch, FetchMut, Entities, WriteStorage, Join};
 
-use game_state::{ GameState };
+use game_state::GameState;
 
-use geometry::{ Rect };
+use geometry::Rect;
 
-use components::space::{ Position, Level, Vector, Viewport, mul };
-use components::player::{ Player, Equipment };
-use components::common::{ Active, InTurn, MoveToPosition, CharacterStats, ItemStats };
-use components::inventory::{ Inventory };
-use components::interaction::{ Interactable, Interaction };
-use engine::input_handler::{ InputHandler };
-use engine::time::{ Time };
+use components::space::{Position, Level, Vector, Viewport, mul};
+use components::player::{Player, Equipment};
+use components::common::{Active, InTurn, MoveToPosition, CharacterStats, ItemStats};
+use components::inventory::Inventory;
+use components::interaction::{Interactable, Interaction};
+use engine::input_handler::InputHandler;
+use engine::time::Time;
 
-use event_log::{ EventLog, LogEvent };
-use tower::{ Tower };
-use maps::{ Map };
+use event_log::{EventLog, LogEvent};
+use tower::Tower;
+use maps::Map;
 
 pub struct PlayerController;
+
 unsafe impl Sync for PlayerController {}
 
 fn get_delta(input: &InputHandler) -> Vector {
@@ -70,38 +71,31 @@ pub struct PlayerControllerData<'a> {
     viewport: Fetch<'a, Viewport>,
 }
 
-const PLAYER_SPEED: f32 = 4.0;
-impl<'a> System<'a> for PlayerController {
-    type SystemData = PlayerControllerData<'a>;
-
-    fn run(&mut self, mut data: PlayerControllerData) {
-        let delta_time = data.time.delta_time.subsec_nanos() as f32 / 1.0e9;
-
-        if data.state.is_turn_based {
-            if let Some ((id, p, _, _, turn, equipment, level)) = (&* data.entities, &data.positions, &data.actives, &data.players, &mut data.in_turns, &data.equipments, &data.levels).join().next() {
-                if data.input.is_mouse_pressed() {
-                    let pos_trans = data.viewport.inv_transform(data.input.mouse_pos);
-                    let maps = data.tower.get(level).unwrap();
-                    if let Some(pos) = maps.screen_to_map(pos_trans) {
-                        if data.viewport.visible(pos_trans) {
-                            if !data.input.ctrl {
-                                let path = maps.find_path(&id, (p.x as i32, p.y as i32), pos);
-                                let cost = distance_cost(path.len(), &turn);
-                                if let Some(c) = cost {
-                                    data.move_to_positions.insert(id, MoveToPosition { path: path, speed: PLAYER_SPEED });
-                                    turn.walk(c);
-                                }
-                            } else {
-                                if let Some(entity) = equipment.active_item {
-                                    if let Some(item_stat) = data.item_stats.get(entity) {
-                                        let characters = maps.collect_characters_with_ray((p.x as i32, p.y as i32), pos, item_stat.range);
-                                        if let Some(target) = characters.front() {
-                                            if let Some(character_stat) = data.char_stats.get_mut(*target) {
-                                                let damage = character_stat.apply_damage(item_stat);
-                                                data.log.log(LogEvent::DidDamage(id, *target, damage));
-                                                turn.fight();
-                                                turn.action_done();
-                                            }
+impl PlayerController {
+    fn process_turn_based(&self, data: &mut PlayerControllerData) {
+        if let Some((id, p, _, _, turn, equipment, level)) = (&*data.entities, &data.positions, &data.actives, &data.players, &mut data.in_turns, &data.equipments, &data.levels).join().next() {
+            if data.input.is_mouse_pressed() {
+                let pos_trans = data.viewport.inv_transform(data.input.mouse_pos);
+                let maps = data.tower.get(level).unwrap();
+                if let Some(p1) = maps.screen_to_map(pos_trans) {
+                    let p0 = (p.x as i32, p.y as i32);
+                    if data.viewport.visible(pos_trans) {
+                        if !data.input.ctrl {
+                            let path = maps.find_path(&id, p0, p1);
+                            if let Some(c) = distance_cost(path.len(), &turn) {
+                                data.move_to_positions.insert(id, MoveToPosition { path: path, speed: PLAYER_SPEED });
+                                turn.walk(c);
+                            }
+                        } else {
+                            if let Some(entity) = equipment.active_item {
+                                if let Some(item_stat) = data.item_stats.get(entity) {
+                                    let characters = maps.collect_characters_with_ray(p0, p1, item_stat.range);
+                                    if let Some(target) = characters.front() {
+                                        if let Some(character_stat) = data.char_stats.get_mut(*target) {
+                                            let damage = character_stat.apply_damage(item_stat);
+                                            data.log.log(LogEvent::DidDamage(id, *target, damage));
+                                            turn.fight();
+                                            turn.action_done();
                                         }
                                     }
                                 }
@@ -110,44 +104,66 @@ impl<'a> System<'a> for PlayerController {
                     }
                 }
             }
-        } else {
-            if let Some((id, p, level, _, _)) = (&*data.entities, &data.positions, &data.levels, &data.players, &data.actives).join().next() {
-                let maps = data.tower.get(level).unwrap();
-                if data.input.is_mouse_pressed() {
-                    let pos_trans = data.viewport.inv_transform(data.input.mouse_pos);
-                    if let Some(pos) = maps.screen_to_map(pos_trans) {
-                        if data.viewport.visible(pos_trans) {
-                            // set the position to the middle of the cell to avoid twitching.
-                            let path = maps.find_path(&id, (p.x as i32, p.y as i32), pos);
-                            data.move_to_positions.insert(id, MoveToPosition { path: path,
-                                                                          speed: PLAYER_SPEED });
-                        }
-                    }
-                } else {
-                    let delta = get_delta(&data.input);
-                    if delta.x != 0.0 || delta.y != 0.0 {
-                        let np = *p + mul(delta.norm(), delta_time*PLAYER_SPEED);
-                        let mut path = VecDeque::new();
-                        path.push_back(np);
-                        data.move_to_positions.insert(id, MoveToPosition { path: path,
-                                                                      speed: PLAYER_SPEED });
-                    }
+        }
+    }
 
-                    if data.input.is_char_pressed('e') {
-                        let pos = (p.x as i32, p.y as i32);
-                        let targets = maps.collect_characters_with_shape(
-                            Rect::new(pos.0 - 1, pos.1 - 1, 3, 3));
+    fn process_free(&self, data: &mut PlayerControllerData) {
+        if let Some((id, p, level, _, _)) = (&*data.entities, &data.positions, &data.levels, &data.players, &data.actives).join().next() {
+            let maps = data.tower.get(level).unwrap();
+            let p0 = (p.x as i32, p.y as i32);
+            if data.input.is_mouse_pressed() {
+                let pos_trans = data.viewport.inv_transform(data.input.mouse_pos);
+                if let Some(p1) = maps.screen_to_map(pos_trans) {
+                    if data.viewport.visible(pos_trans) {
+                        // set the position to the middle of the cell to avoid twitching.
+                        let path = maps.find_path(&id, p0, p1);
+                        data.move_to_positions.insert(id, MoveToPosition {
+                            path: path,
+                            speed: PLAYER_SPEED
+                        });
+                    }
+                }
+            } else {
+                let delta = get_delta(&data.input);
+                if delta.x != 0.0 || delta.y != 0.0 {
+                    let delta_time = data.time.delta_time.subsec_nanos() as f32 / 1.0e9;
+                    let np = *p + mul(delta.norm(), delta_time * PLAYER_SPEED);
+                    let mut path = VecDeque::new();
+                    path.push_back(np);
+                    data.move_to_positions.insert(id, MoveToPosition {
+                        path: path,
+                        speed: PLAYER_SPEED
+                    });
+                }
 
-                        let first_interactable_id = targets.into_iter()
-                            .filter(|i| data.interactables.get(*i).is_some())
-                            .next();
-                        if let Some(target_id) = first_interactable_id {
-                            data.interactions.insert(target_id, Interaction { actor: id });
-                        }
+                if data.input.is_char_pressed('e') {
+                    let targets = maps.collect_characters_with_shape(
+                        Rect::new(p0.0 - 1, p0.1 - 1, 3, 3));
+
+                    let first_interactable_id = targets.into_iter()
+                        .filter(|i| data.interactables.get(*i).is_some())
+                        .next();
+                    if let Some(target_id) = first_interactable_id {
+                        data.interactions.insert(target_id, Interaction { actor: id });
                     }
                 }
             }
         }
+    }
+}
+
+const PLAYER_SPEED: f32 = 4.0;
+
+impl<'a> System<'a> for PlayerController {
+    type SystemData = PlayerControllerData<'a>;
+
+    fn run(&mut self, mut data: PlayerControllerData) {
+        if data.state.is_turn_based {
+            self.process_turn_based(&mut data);
+        } else {
+            self.process_free(&mut data);
+        }
+
         if let Some((id, inventory, equipment, level, _, _)) = (&*data.entities, &mut data.inventories, &mut data.equipments, &data.levels, &data.players, &data.actives).join().next() {
             let p = data.positions.get(id).unwrap().clone();
             let maps = data.tower.get_mut(level).unwrap();

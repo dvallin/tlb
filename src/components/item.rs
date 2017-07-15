@@ -3,6 +3,7 @@ use components::appearance::{ Renderable };
 use components::common::{ Description, ItemStats };
 use tcod::colors::{ self };
 
+#[derive(PartialEq, Debug, Copy, Clone)]
 pub enum Type {
     Item,
     Consumable,
@@ -10,6 +11,7 @@ pub enum Type {
     Weapon,
 }
 
+#[derive(PartialEq, Debug, Copy, Clone)]
 pub enum Rarity {
     Common,
     Uncommon,
@@ -18,6 +20,7 @@ pub enum Rarity {
     Epic,
 }
 
+#[derive(Copy, Clone, Debug, PartialEq, Eq, Hash)]
 pub enum ItemInstance {
     DartGun,
     KeyCard(i32),
@@ -26,6 +29,7 @@ pub enum ItemInstance {
     Lighter,
     Manriki,
     PocketVtr,
+    GasMask,
     Shuriken,
     Simstim,
     Watch,
@@ -79,7 +83,7 @@ impl Item {
             Lighter | Watch => (Common, Item),
             FlickKnife => (Common, Weapon),
 
-            PocketVtr => (Uncommon, Equipment),
+            PocketVtr | GasMask => (Uncommon, Equipment),
             Manriki | Shuriken => (Uncommon, Weapon),
 
             Simstim => (Rare, Equipment),
@@ -106,6 +110,7 @@ impl Item {
             Lighter => Description::new("Lighter", "A cerosine fueled lighter"),
             Manriki => Description::new("Weighted manriki chains", "The thousand power chain of ancient japanese, made from old german steel."),
             PocketVtr => Description::new("Pocket VTR", "Handheld video tape recording device"),
+            GasMask => Description::new("Gas Mask", "A traditional japanese gas mask"),
             Shuriken => Description::new("Shuriken", "A traditional japanese conceiled weapon"),
             Simstim => Description::new("Simstim deck", "Remotly simulates stimuli captured from another person to the wearer"),
             Watch => Description::new("Watch", "A plastic watch"),

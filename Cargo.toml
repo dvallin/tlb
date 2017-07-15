@@ -4,6 +4,7 @@ version = "0.1.0"
 authors = ["max <schuler.maximilian@gmail.com>"]
 
 [dependencies]
+rand = "0.3"
 tcod = "0.11"
 shred = "0.4.3"
 shred-derive = "0.3"

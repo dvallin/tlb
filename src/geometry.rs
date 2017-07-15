@@ -45,7 +45,7 @@ pub struct Ellipse {
 
 impl Line {
     pub fn new(x1: i32, y1: i32, x2: i32, y2: i32) -> Self {
-        assert!(x1 != y1 || x2 != y2);
+        assert!(x1 != x2 || y1 != y2);
         Line { p1: (x1, y1), p2: (x2, y2) }
     }
 }
@@ -372,24 +372,19 @@ impl Iterator for RectIter {
 #[cfg(test)]
 mod tests {
     use geometry::{ Line };
-    use std::fmt::{ Display };
+    use std::fmt::{ Display, Debug };
 
     fn assert_equals<T>(a: T, b: T)
         where T: PartialEq<T> + Display {
         assert!(a == b, "{} is not {}", a, b);
     }
 
-    fn assert_equals_pos(a: (i32, i32), b: (i32, i32)) {
-        assert_equals(a.0, b.0);
-        assert_equals(a.1, b.1);
+    fn assert_equals_pos<T>(a: (T, T), b: (T, T))
+        where T: PartialEq<T> + Debug {
+        assert!(a.0 == b.0, "{:?} is not {:?}", a, b);
+        assert!(a.1 == b.1, "{:?} is not {:?}", a, b);
     }
 
-    #[test]
-    fn single_pixel_lines() {
-        assert!(Line::new(0,0,0,0).into_iter().count() == 1);
-        let p = Line::new(0,0,0,0).into_iter().next().unwrap();
-        assert!(p.0 == 0 && p.1 == 0);
-    }
     #[test]
     fn all_directions_lines() {
         assert_equals_pos(Line::new(0,0, 1, 0).into_iter().nth(1).unwrap(), (1, 0));
@@ -412,6 +407,7 @@ mod tests {
         assert_equals(Line::new(0,0,0,9).into_iter().count(), 10);
     }
 
+    #[test]
     fn diagonal_lines() {
         assert_equals(Line::new(0,0,1,1).into_iter().count(), 2);
         assert_equals(Line::new(0,0,2,2).into_iter().count(), 3);
